@@ -64,13 +64,37 @@ list(c_lb_sd_case_wt_10_new,
   ) %>% 
   table1()
 
+#calculate the n and % of exposure for each chemical: combine
+dur_long_combine <- list(c_lb_sd_case_wt_10_new, r_lb_sd_case_wt_10_new) %>% 
+  map(function(data){
+    data %>% 
+      dplyr::select(pegid,starts_with("chem")) 
+  }) %>% 
+  bind_rows() %>% 
+  distinct() %>% 
+  group_by(pegid) %>% 
+  summarise_all(sum, na.rm=T) %>% 
+  pivot_longer(
+    cols = starts_with("chem"),
+    names_to = c("chemcode"),
+    values_to = "duration") %>% 
+  mutate(dur_ind=if_else(duration>0,1,0)) %>% 
+  group_by(chemcode) %>% 
+  summarise(n_exp = sum(dur_ind),
+            .groups = "keep") %>% 
+  mutate(pct = n_exp/569) %>% 
+  left_join(chemlist_new, by="chemcode") %>% 
+  left_join(chem_class, by = c("chemname","chemcode")) %>% 
+  relocate(chemname,chemcode,`chem class (pan)`)
+
+
 #heavy metal chemical use
 
 list(exp_window_address_case_c, exp_window_address_case_r) %>% 
   map(function(data){
     data %>% 
       filter(chemcode %in% heavy_metal$chemcode) %>%
-      mutate_at(vars(sum_total_lbs), dec_out_na) %>% 
+      # mutate_at(vars(sum_total_lbs), dec_out_na) %>% 
       group_by(pegid,year) %>% 
       summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
       inner_join(pest_case_methylation, by = "pegid") %>%
@@ -99,8 +123,9 @@ list(list(outcheck_c,outcheck_r),
   #geom_point()+
   geom_line(linewidth=1) +
   scale_color_colorblind() +
-  #scale_color_ordinal(labels=c("Without PD", "With PD")) +
+  # scale_color_ordinal(labels=c("Without PD", "With PD")) +
   geom_vline(xintercept = 1989, lty=2) +
+  
   theme_classic()+
   theme( plot.title = element_text(hjust = 0.5, size=20,face="bold"),
          axis.text = element_text(size = 15),
@@ -269,7 +294,7 @@ barplot(methylRRA_chem251_r, num = 10, colorby = "pvalue")
 barplot(methylRRA_chem599_r, num = 10, colorby = "pvalue")
 
 
-
+methylRRA_chem1638_r <- methylRRA(cpg.pval = meta.cpg_list_r[["chem1638"]], method = "GSEA")
 
 # Pathway analysis --------------------------------------------------------
 
@@ -314,3 +339,84 @@ list(methylglm_pan_c, methylglm_pan_r) %>%
   }) %>% 
   set_names("methylglm_path_c","methylglm_path_r") %>% 
   list2env(.,envir = .GlobalEnv)
+
+
+# Visualization -----------------------------------------------------------
+
+
+#occupational
+list(quote_all(chem354,chem251,chem599),
+     quote_all(cg07699440, cg16282242, cg24896860))%>% 
+  pmap(function(chem,cpg){
+    test <- champ_dmplist_case_heavymetal_sig_c[[chem]]
+    test2 <- t(combined_resid_filter_pd_c %>% 
+                 filter(rownames(.) %in% rownames(test))) %>% 
+      as.data.frame()
+    test3 <- cbind(c_lb_sd_case_wt_10_new %>% 
+                     dplyr::select(chem), test2)
+    test3 %>% 
+      dplyr::select(chem,cpg) %>% 
+      ggplot(aes(x = test3[,1], y = test3[,2])) + 
+      geom_point() +
+      geom_smooth(method = "loess") +
+      labs(x = chem,
+           y = cpg)
+  })
+
+#occupational
+list(quote_all(chem1876,chem1673,chem1638),
+     quote_all(cg12017057, cg15569292, cg10397063))%>% 
+  pmap(function(chem,cpg){
+    test <- champ_dmplist_case_heavymetal_sig_c[[chem]]
+    test2 <- t(combined_resid_filter_pd_c %>% 
+                 filter(rownames(.) %in% rownames(test))) %>% 
+      as.data.frame()
+    test3 <- cbind(c_lb_sd_case_wt_10_new %>% 
+                     dplyr::select(chem), test2)
+    test3 %>% 
+      dplyr::select(chem,cpg) %>% 
+      ggplot(aes(x = test3[,1], y = test3[,2])) + 
+      geom_point() +
+      geom_smooth(method = "loess") +
+      labs(x = chem,
+           y = cpg)
+  })
+
+#residential
+list(quote_all(chem354,chem251,chem599),
+     quote_all(cg00540866, cg26842720, cg09010802))%>% 
+  pmap(function(chem,cpg){
+    test <- champ_dmplist_case_heavymetal_sig_r[[chem]]
+    test2 <- t(combined_resid_filter_pd_r %>% 
+                 filter(rownames(.) %in% rownames(test))) %>% 
+      as.data.frame()
+    test3 <- cbind(r_lb_sd_case_wt_10_new %>% 
+                     dplyr::select(chem), test2)
+    test3 %>% 
+      dplyr::select(chem,cpg) %>% 
+      ggplot(aes(x = test3[,1], y = test3[,2])) + 
+      geom_point() +
+      geom_smooth(method = "loess") +
+      labs(x = chem,
+           y = cpg)
+  })
+
+#residential
+list(quote_all(chem1876,chem1673,chem1638),
+     quote_all(cg04334751, cg15569292, cg21103170))%>% 
+  pmap(function(chem,cpg){
+    test <- champ_dmplist_case_heavymetal_sig_r[[chem]]
+    test2 <- t(combined_resid_filter_pd_r %>% 
+                 filter(rownames(.) %in% rownames(test))) %>% 
+      as.data.frame()
+    test3 <- cbind(r_lb_sd_case_wt_10_new %>% 
+                     dplyr::select(chem), test2)
+    test3 %>% 
+      dplyr::select(chem,cpg) %>% 
+      ggplot(aes(x = test3[,1], y = test3[,2])) + 
+      geom_point() +
+      geom_smooth(method = "loess") +
+      labs(x = chem,
+           y = cpg)
+  })
+

@@ -313,7 +313,7 @@
                    "11887JA27", "12158FS27", "12313LH31", "85491MA39") 
   id_remove_r <- c("11887JA27")
   
-  #drop pegids which are not in grape in/out data
+  #drop pegids which are not in grape in/out data & winsorize
   c_lb_sd_case_wt_10_new <- c_lb_sd_case_wt_10 %>%
     filter(pegid %notin% id_remove_c &
              !is.na(pegid)) %>% 
