@@ -46,18 +46,17 @@ PEG_NOOB_nors_filter <- PEG_NOOB_nors_new %>%
 save(PEG_NOOB_nors_filter, file = "PEG_NOOB_nors_filter.RData")
 
 #limit to PD case only
-sampleid_pd <- list(c_lb_sd_wt_10_new, r_lb_sd_wt_10_new) %>% 
+list(c_lb_sd_case_wt_10_new, r_lb_sd_case_wt_10_new) %>% 
   map(function(data){
     data %>% 
-      filter(pd_new == "With PD") %>% 
-      select(sampleid)
+      select(sampleid) %>% 
+      as_vector()
   }) %>% 
-  rbindlist() %>% 
-  distinct() %>% 
-  as_vector()
+  set_names("sampleid_pd_c","sampleid_pd_r") %>% 
+  list2env(.,envir = .GlobalEnv)
 
 #select covariates
-list(c_lb_sd_wt_10_new, r_lb_sd_wt_10_new) %>% 
+list(c_lb_sd_case_wt_10_new, r_lb_sd_case_wt_10_new) %>% 
   map(function(data){
     data %>% 
       filter(sampleid %in% sampleid_pd) %>% 
@@ -68,7 +67,7 @@ list(c_lb_sd_wt_10_new, r_lb_sd_wt_10_new) %>%
   list2env(.,envir = .GlobalEnv)
 
 #winsorize the beta matrix for occupational and residential, respectively
-list(c_lb_sd_wt_10_new, r_lb_sd_wt_10_new) %>% 
+list(c_lb_sd_case_wt_10_new, r_lb_sd_case_wt_10_new) %>% 
   map(function(data){
     PEG_NOOB_nors_filter %>% 
       select(all_of(data %>% 
@@ -82,6 +81,7 @@ list(c_lb_sd_wt_10_new, r_lb_sd_wt_10_new) %>%
   }) %>% 
   set_names("PEG_NOOB_nors_win_filter_pd_c","PEG_NOOB_nors_win_filter_pd_r") %>% 
   list2env(.,envir = .GlobalEnv)
+
 
 #check rownames
 table(rownames(PEG_NOOB_nors_win_filter_pd_c)==rownames(PEG_NOOB_nors_filter))
