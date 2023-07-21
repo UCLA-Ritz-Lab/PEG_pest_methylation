@@ -54,10 +54,10 @@ pacman::p_load(
   #"lme4",        #linear mixed-effects model: lmer()
   #"nlme",        #linear and nonlinear mixed effects:
   # "minfi",       #getBeta(), getSex()
-  # "meffil",      #normalization: meffil.normalize.dataset(), ewas: meffil.ewas()
+  "meffil",      #normalization: meffil.normalize.dataset(), ewas: meffil.ewas()
   # "DMRcate",      #For DMR analysis: dmrcate()
   # "WGCNA",       #weighted correlation network analysis: GOenrichmentAnalysis()
-  #"ChAMP",       #champ.DMP(), champ.DMR()
+  "ChAMP",       #champ.DMP(), champ.DMR()
   #"mixOmics",    #block.plsda()
   
   #For loading data
@@ -117,42 +117,27 @@ table1 <- function(table) {
   
 }
 
-isnt_out_z <- function(x, thres = 3, na.rm = TRUE) {
-  abs(x - mean(x, na.rm = na.rm)) <= thres * sd(x, na.rm = na.rm)
-}
-isnt_out_mad <- function(x, thres = 3, na.rm = TRUE) {
-  abs(x - median(x, na.rm = na.rm)) <= thres * mad(x, na.rm = na.rm)
-}
-isnt_out_tukey <- function(x, k = 1.5, na.rm = TRUE) {
-  quar <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm)
-  iqr <- diff(quar)
-  
-  (quar[1] - k * iqr <= x) & (x <= quar[2] + k * iqr)
+#create functions to remove outliers
+
+## 1. use IQR, an alternative of 1
+extreme_remove_iqr <- function(x) {
+  Q = quantile(x, c(0.25, 0.75), na.rm = TRUE)
+  iqr = IQR(x, na.rm = TRUE)
+  x = if_else(x < Q[1] - 1.5 * iqr | x > Q[2] + 1.5 * iqr, NA, x)
 }
 
-isnt_out_funs <- list(
-  z2 = isnt_out_z,
-  mad = isnt_out_mad,
-  tukey = isnt_out_tukey
-)
-
-dec_out_na <- function(x, thres = 3, na.rm = TRUE) {
-  sd <- sd(x, na.rm = na.rm)
-  mean <- mean(x, na.rm = na.rm)
-  id_out = x > mean + thres * sd | x < mean - thres * sd
-  x[id_out] = NA
-  return(x)
+## 2. use percentile/thousands: remove
+extreme_remove_percentile <- function(x) {
+  Q = quantile(x, c(0.001, 0.999), na.rm = TRUE)
+  x = if_else(x < Q[1] | x > Q[2], NA, x)
 }
 
 
-dec_out <- function(x, thres = 3, na.rm = TRUE) {
-  sd <- sd(x, na.rm = na.rm)
-  mean <- mean(x, na.rm = na.rm)
-  id_p = x > mean + thres * sd
-  id_n = x < mean - thres * sd
-  x[id_p] = mean + thres * sd
-  x[id_n] = mean - thres * sd
-  return(x)
+## 3. use percentile/thousands: winsorization
+extreme_remove_percentile_win <- function(x) {
+  Q = quantile(x, c(0.001, 0.999), na.rm = TRUE)
+  x = case_when(x < Q[1] ~ Q[1],
+                x > Q[2] ~ Q[2],
+                TRUE ~ x)
 }
-
 #--------------------------------End of the code--------------------------------

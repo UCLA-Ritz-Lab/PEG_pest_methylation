@@ -24,6 +24,7 @@ myvar <- quote_all(pegid,sampleid,age, pd_new,female,
                    smokers, a1_schyrs, ethnicity, county,
                    pdstudystudy,meanmethbysample)
 
+
 list(c_lb_sd_case_wt_10_new,
      r_lb_sd_case_wt_10_new) %>% 
   map(function(data){
@@ -46,22 +47,17 @@ list(c_lb_sd_case_wt_10_new,
   ) %>% 
   distinct() %>% 
   #filter(pegid %in% datSampleSteve$externaldnacode) %>% 
-  select(-c(sampleid,pegid)) %>%
-  tbl_strata(
-    strata = pdstudystudy,
-    .tbl_fun =
-      ~ .x %>%
-      tbl_summary(by = pd_new, missing = "no",
-                  #type=list(c(female) ~ "categorical"),
-                  statistic = list(all_continuous() ~ "{mean} ({sd})",
-                                   all_categorical() ~ "{n} ({p}%)"),
-                  digits = list(all_continuous() ~ 1,
-                                all_categorical() ~ 1)) %>%
-      modify_header(label = "**Characteristics**") %>%
-      modify_spanning_header(starts_with("stat_") ~ "**PD status**") %>%
-      modify_caption("Table 1. Demographic characteristics of PEG cases (N = 569)") %>%
-      bold_labels() 
-  ) %>% 
+  select(-c(sampleid,pegid, pd_new)) %>%
+  tbl_summary(missing = "no",
+              #type=list(c(female) ~ "categorical"),
+              statistic = list(all_continuous() ~ "{mean} ({sd})",
+                               all_categorical() ~ "{n} ({p}%)"),
+              digits = list(all_continuous() ~ 1,
+                            all_categorical() ~ 1)) %>%
+  modify_header(label = "**Characteristics**") %>%
+  modify_spanning_header(starts_with("stat_") ~ "**PD status**") %>%
+  modify_caption("Table 1. Demographic characteristics of PEG cases (N = {N})") %>%
+  bold_labels() %>% 
   table1()
 
 #calculate the n and % of exposure for each chemical: combine
@@ -94,7 +90,7 @@ list(exp_window_address_case_c, exp_window_address_case_r) %>%
   map(function(data){
     data %>% 
       filter(chemcode %in% heavy_metal$chemcode) %>%
-      # mutate_at(vars(sum_total_lbs), dec_out_na) %>% 
+      mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
       group_by(pegid,year) %>% 
       summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
       inner_join(pest_case_methylation, by = "pegid") %>%
@@ -111,6 +107,7 @@ list(list(outcheck_c,outcheck_r),
       mutate(location = data2)
   }) %>% 
   rbindlist() %>% 
+  filter(year <= 2008) %>% 
   group_by(year, location) %>% 
   summarise(y=mean(sum_total_lbs, na.rm=T),.groups="keep") %>% #change to average per person, including unexposed people
   ggplot(aes(x=year, y=y, group=location, color = factor(location))) + 
@@ -125,7 +122,6 @@ list(list(outcheck_c,outcheck_r),
   scale_color_colorblind() +
   # scale_color_ordinal(labels=c("Without PD", "With PD")) +
   geom_vline(xintercept = 1989, lty=2) +
-  
   theme_classic()+
   theme( plot.title = element_text(hjust = 0.5, size=20,face="bold"),
          axis.text = element_text(size = 15),

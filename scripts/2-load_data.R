@@ -8,18 +8,27 @@
 # Load data ---------------------------------------------------------------
 
 {
+  # Define variable names for specific data files.
   grape_name <- quote_all(c_grape_in,c_walk, c_grape_out, 
                           r_grape_out, r_grape_in, r_walk)
+ 
+  # Get a list of all .txt files in the current directory and subdirectories. 
   list.dirs(here(),recursive = FALSE) %>% 
-    list.files("\\.txt$", full.names = TRUE, recursive = T) %>%
-    grep("(?i)XWALK|(?i)GRAPES|input2",., value=TRUE, ignore.case = TRUE) %>% 
+    list.files("\\.txt$", full.names = TRUE, recursive = T) %>% 
+    # Search for files
+    grep("(?i)XWALK|(?i)GRAPES|input2",., value=TRUE, ignore.case = TRUE) %>%
+    # Read in each file
     map(read_delim) %>%
+    # Rename all column names to lowercase
     map(~rename_all(.x, str_to_lower)) %>% 
+    # Assign each data frame a name
     set_names(grape_name) %>%
     list2env(.,envir = .GlobalEnv)
   
+  # The following sessions follow the same logic.
   exposure <- quote_all(exp_c,c_dur_nolag_dr,c_wt_long,chem_class,
                         chemlist,indexyr,serum,exp_r,r_dur_nolag_dr,r_wt_long)
+  
   list.dirs(here(),recursive = FALSE) %>% 
     list.files("\\.xlsx$", full.names = TRUE, recursive = T) %>%
     grep("nolag|wt_long|chemlist|dr_long|SERUM|Indexyr2|chem_class",., 
@@ -31,6 +40,7 @@
   
   
   pest_name <- quote_all(peg_c,cgep_intv,pest_cov_more,pest_cov,peg_r)
+  
   list.dirs(here(),recursive = FALSE) %>%
     list.files("\\.csv$", full.names = TRUE, recursive = T) %>%
     grep("avg_lag10|Pest_cov|CGEP_intv",., value=TRUE, ignore.case = TRUE) %>%
@@ -70,34 +80,8 @@
     map(~rename_all(.x, str_to_lower)) %>%
     set_names(keyvar) %>%
     list2env(.,envir = .GlobalEnv)
-  # memory.size()
-  # gc()
-  # memory.limit(size=56000)
-  # listname <- quote_all(chem_wd,chem_wd_new,
-  #                       ewas.summary_list_all_c,ewas.summary_list_all_r)
-  # list.dirs(here(),recursive = FALSE) %>%
-  #   list.files("\\.rds$", full.names = TRUE, recursive = T) %>%
-  #   map(read_rds) %>%
-  #   #map(~rename_all(.x, str_to_lower)) %>%
-  #   set_names(listname) %>%
-  #   list2env(.,envir = .GlobalEnv)
-  # chem_wd_new <- read_rds(here("data","chem_wd_new.rds"))
-  
-  # matrix_name <- quote_all(cpg_matrix_c,cpg_matrix_r, pest_label_c, pest_label_r, pest_matrix_c, pest_matrix_r)
-  # list.dirs(here(),recursive = FALSE) %>% 
-  #   list.files("\\.txt$", full.names = TRUE, recursive = T) %>%
-  #   grep("(?i)pest_matrix|cpg_matrix|pest_label",., value=TRUE, ignore.case = TRUE) %>% 
-  #   map(read_delim) %>%
-  #   map(~rename_all(.x, str_to_lower)) %>% 
-  #   set_names(matrix_name) %>%
-  #   list2env(.,envir = .GlobalEnv)
-  
-  # load("meffil_list_all_yg_win_c.RData")
-  # load("meffil_list_all_yg_win_r.RData")
-  # load("combined_resid_new_c.RData")
-  # load("combined_resid_new_r.RData")
-  # load(here("data", "methylation", "processed", "champ_dmplist_all_kp_win_c.RData"))
-  # load(here("data", "methylation", "processed", "champ_dmplist_all_kp_win_r.RData"))
+
+
 }
 
   

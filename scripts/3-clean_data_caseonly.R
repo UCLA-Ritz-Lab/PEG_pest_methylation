@@ -24,7 +24,8 @@
 
 {
   heavy_metal <- chem_class %>% 
-    filter(str_detect(`chem class (pan)`, "(?i)metal"))
+    filter(str_detect(`chem class (pan)`, "(?i)metal|copper")) %>% 
+    filter(chemcode %notin% c("chem1751"))
   
   keyvars <- quote_all(pegid, smoker, age_diag, county, sex, race, 
                        minority, a1_schyrs, date_main_interview_collected)
@@ -34,7 +35,7 @@
       data %>% 
         select(all_of(keyvars)) %>% 
         mutate_all(~replace(.x, .x == -6, NA)) %>% 
-        filter(nchar(pegid)>5) %>% 
+        filter(str_length(pegid)>5) %>% 
         mutate(interview_date = year(date_main_interview_collected))
     }) %>% 
     bind_rows() %>% 
@@ -88,7 +89,6 @@
            indexyr = index_date,
            indexyr5 = indexyr-5,
            indexyr10 = indexyr-10) %>% 
-
     filter(pd_new == "With PD") %>% 
     modify_if(is.labelled, to_factor) %>% 
     mutate_at(vars(pd_new, race_new), fct_rev)
@@ -126,8 +126,11 @@
   list(c_grape_out,r_grape_out) %>% 
     map(function(data){
       data %>% 
-        filter(year > 1973 & year < 2008 & chempound >= 0 
-               & pegid %in% case_ids$pegid) %>% 
+        inner_join(pest_case_methylation %>% 
+                    select(pegid, indexyr), by = "pegid") %>% 
+        group_by(pegid) %>% 
+        filter(year > 1973 & year <= indexyr & chempound >= 0) %>% 
+        ungroup() %>% 
         mutate(chemcode = paste0("chem",chemcode)) %>% 
         group_by(pegid, year, chemcode) %>%
         summarise(sum_total_lbs = sum(chempound),
@@ -143,18 +146,23 @@
     list(c_grape_in,r_grape_in) %>% 
       map(function(data){
         data %>% 
-          filter(year > 1973 & year < 2008 & pegid %in% case_ids$pegid) %>% 
+          inner_join(pest_case_methylation %>% 
+                       select(pegid, indexyr), by = "pegid") %>% 
+          group_by(pegid) %>% 
+          filter(year > 1973 & year <= indexyr) %>% 
+          ungroup() %>% 
           select(pegid, year)
       }), 
     list(c_grape_case_agg,r_grape_case_agg)) %>% 
     pmap(left_join, by = c("pegid","year")) %>% 
     map(function(data){
       data %>% 
-        mutate(sum_total_lbs = ifelse(is.na(sum_total_lbs),0,sum_total_lbs))
+        mutate(sum_total_lbs = ifelse(is.na(sum_total_lbs), 0, sum_total_lbs))
     }) %>% 
     set_names("c_agg_yr_case_all","r_agg_yr_case_all") %>% 
     list2env(.,envir = .GlobalEnv)
   
+  # Calculate lagged years
   list(list(c_grape_in,r_grape_in),
        c("c","r")) %>% 
     pmap(function(data1,data2){
@@ -165,9 +173,9 @@
                      select(pegid, indexyr, indexyr5, indexyr10, pd_new, study), 
                    by = "pegid") %>% 
         filter(year > 1973) %>% 
-        mutate(exp_yrs_lag_dr = ifelse(year<=indexyr,1,NA),
-               exp_yrs_lag_5 = ifelse(year<=indexyr5,1,NA),
-               exp_yrs_lag_10 = ifelse(year<=indexyr10,1,NA)) %>% 
+        mutate(exp_yrs_lag_dr = ifelse(year <= indexyr,1,NA),
+               exp_yrs_lag_5 = ifelse(year <= indexyr5,1,NA),
+               exp_yrs_lag_10 = ifelse(year <= indexyr10,1,NA)) %>% 
         group_by(pegid) %>% 
         summarise_at(vars(starts_with("exp")),~sum(.x,na.rm=T),
                      .groups = "keep") %>% 
@@ -193,13 +201,13 @@
   list(c_agg_yr_case_all,r_agg_yr_case_all) %>% 
     map(function(data){
       data %>% 
-        right_join(pest_case_methylation %>% 
-                     select(pegid, index_date, pd_new, study), 
+        inner_join(pest_case_methylation %>% 
+                     select(pegid, indexyr, pd_new, study), 
                    by = "pegid") %>% 
         mutate(window=cut(year,breaks = c(1973, 1989, Inf),
                           include.lowest = FALSE,
                           labels = c("1974-1989","1990-index"))) %>% 
-        filter(year <= index_date) %>%
+        # filter(year <= indexyr) %>%
         distinct() 
     }) %>% 
     set_names("exp_window_address_case_c", "exp_window_address_case_r") %>% 
@@ -273,7 +281,7 @@
           names_from = chemcode,
           values_from = chemuse_wt_10
         ) %>% 
-        select(pegid, all_of(heavy_metal$chemcode)) %>% 
+        select(pegid, any_of(heavy_metal$chemcode)) %>% 
         full_join(datSamplePEG %>%
                     select(all_of(myvar1)), by = "pegid") %>%
         left_join(datSampleSteve %>%
@@ -308,25 +316,31 @@
     set_names("c_lb_sd_case_wt_10", "r_lb_sd_case_wt_10") %>% 
     list2env(.GlobalEnv)
   
+  # setdiff(names(r_lb_sd_case_wt_10), names(c_lb_sd_case_wt_10))
+  
+  #drop pegids which are not in grape in/out data & z-transform
   
   id_remove_c <- c("10259MK15", "10818RH27", "11022FC23", 
                    "11887JA27", "12158FS27", "12313LH31", "85491MA39") 
   id_remove_r <- c("11887JA27")
   
-  #drop pegids which are not in grape in/out data & winsorize
-  c_lb_sd_case_wt_10_new <- c_lb_sd_case_wt_10 %>%
-    filter(pegid %notin% id_remove_c &
-             !is.na(pegid)) %>% 
-    mutate_at(vars(starts_with("chem")), ~dec_out(.x)) %>% 
-    mutate_at(vars(starts_with("chem")), ~scale(replace(., is.na(.)|!is.finite(.), 0), center = FALSE)
-              %>% as.vector()) 
   
-  r_lb_sd_case_wt_10_new <- r_lb_sd_case_wt_10 %>%
-    filter(pegid %notin% id_remove_r &
-             !is.na(pegid)) %>% 
-    mutate_at(vars(starts_with("chem")), ~dec_out(.x)) %>% 
-    mutate_at(vars(starts_with("chem")), ~scale(replace(., is.na(.)|!is.finite(.), 0), center = FALSE)
-              %>% as.vector()) 
+  list(
+    list(c_lb_sd_case_wt_10, r_lb_sd_case_wt_10),
+    list(id_remove_c, id_remove_r)
+  ) %>% 
+    pmap(function(data1, data2){
+      data1 %>% 
+        filter(pegid %notin% data2 &
+                 !is.na(pegid)) %>% 
+        mutate_at(vars(starts_with("chem")), ~extreme_remove_percentile_win(.x)) %>% 
+        mutate_at(vars(starts_with("chem")), 
+                  ~scale(replace(., is.na(.)|!is.finite(.), 0), center = FALSE)
+                  %>% as.vector()) 
+    }) %>% 
+    set_names("c_lb_sd_case_wt_10_new", "r_lb_sd_case_wt_10_new") %>% 
+    list2env(.GlobalEnv)
+ 
 }
 
 
