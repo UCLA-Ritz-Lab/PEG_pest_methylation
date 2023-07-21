@@ -55,7 +55,7 @@ list(c_lb_sd_case_wt_10_new,
               digits = list(all_continuous() ~ 1,
                             all_categorical() ~ 1)) %>%
   modify_header(label = "**Characteristics**") %>%
-  modify_spanning_header(starts_with("stat_") ~ "**PD status**") %>%
+  # modify_spanning_header(starts_with("stat_") ~ "**PD status**") %>%
   modify_caption("Table 1. Demographic characteristics of PEG cases (N = {N})") %>%
   bold_labels() %>% 
   table1()
@@ -84,12 +84,16 @@ dur_long_combine <- list(c_lb_sd_case_wt_10_new, r_lb_sd_case_wt_10_new) %>%
   relocate(chemname,chemcode,`chem class (pan)`)
 
 
-#heavy metal chemical use
+metal_filter <- dur_long_combine %>% 
+  filter(n_exp >= 30) %>% 
+  pull(chemcode) 
+
+#heavy metal chemical use in total
 
 list(exp_window_address_case_c, exp_window_address_case_r) %>% 
   map(function(data){
     data %>% 
-      filter(chemcode %in% heavy_metal$chemcode) %>%
+      filter(chemcode %in% metal_filter) %>%
       mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
       group_by(pegid,year) %>% 
       summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
@@ -126,9 +130,94 @@ list(list(outcheck_c,outcheck_r),
   theme( plot.title = element_text(hjust = 0.5, size=20,face="bold"),
          axis.text = element_text(size = 15),
          axis.title=element_text(size=20,face="bold"),
-         legend.title = element_text(size = 18),
-         legend.text = element_text(size = 15),
+         legend.title = element_text(size = 14),
+         legend.text = element_text(size = 14),
          strip.text = element_text(size=13)) 
+
+#heavy metal chemical use: specific
+
+test <- exp_window_address_case_c %>% 
+  filter(chemcode == "chem151") %>% 
+  mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
+  group_by(pegid,year) %>% 
+  summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
+  inner_join(pest_case_methylation, by = "pegid") %>%
+  replace_na(list(sum_total_lbs = 0))
+
+
+
+list(exp_window_address_case_c, exp_window_address_case_r) %>% 
+  map(function(data){
+    data %>% 
+      filter(chemcode %in% metal_filter) %>%
+      # mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
+      group_by(chemcode) %>% 
+      group_split() %>% 
+      map(function(df){
+        df %>% 
+          mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
+          group_by(pegid,year) %>% 
+          summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
+          inner_join(pest_case_methylation, by = "pegid") %>%
+          replace_na(list(sum_total_lbs = 0))
+      })
+  }) %>% 
+  set_names("outcheck_list_c","outcheck_list_r") %>% 
+  list2env(.,envir = .GlobalEnv)
+
+plotlist <- list(outcheck_list_c, outcheck_list_r) %>% 
+  pmap(function(list1, list2){
+    list(
+      list(list1, list2),
+      c("Occupational","Residential")
+    ) %>% 
+      pmap(function(data1,data2){
+        data1 %>% 
+          drop_na() %>% 
+          mutate(location = data2)
+      }) %>% 
+      rbindlist() %>% 
+      filter(year <= 2008) %>% 
+      group_by(year, location) %>% 
+      summarise(y=mean(sum_total_lbs, na.rm=T),.groups="keep") %>% #change to average per person, including unexposed people
+      ggplot(aes(x=year, y=y, group=location, color = factor(location))) + 
+      annotate("rect", fill = "azure2", alpha = 0.5,
+               xmin = 1989, xmax = 2010,
+               ymin = -Inf, ymax = Inf) +
+      labs(x = "Years",
+           y = "Chemical use (lbs)",
+           color = "Location") +
+      #geom_point()+
+      geom_line(linewidth=1) +
+      scale_color_colorblind() +
+      # scale_color_ordinal(labels=c("Without PD", "With PD")) +
+      geom_vline(xintercept = 1989, lty=2) +
+      theme_classic()+
+      theme( plot.title = element_text(hjust = 0.5, size=20,face="bold"),
+             axis.text = element_text(size = 15),
+             axis.title=element_text(size=20,face="bold"),
+             legend.title = element_text(size = 14),
+             legend.text = element_text(size = 14),
+             strip.text = element_text(size=13)) 
+  })
+
+metal_name <- str_sort(metal_filter) %>% 
+  map(function(chem){
+    heavy_metal %>% 
+      filter(chemcode %in% chem)
+  }) %>% 
+  rbindlist()
+
+
+png(file=here("figures","heavy metal exposure trend.png"), 
+    width = 1920, height = 1920)
+ggarrange(plotlist = plotlist,
+          labels = metal_name$chemname,
+          ncol = 3, nrow = 7)
+dev.off()
+
+
+
 
 # DMP --------------------------------------------------------------------
 
@@ -139,6 +228,7 @@ source(here("scripts", "mclapply.hack.R"))
 source(here("scripts", "meffil_fixed.R"))
 source(here("scripts", "meffil_report_fixed.R"))
 
+
 #Method 1: ChAMP
 library(ChAMP)
 
@@ -146,7 +236,7 @@ list(list(c_lb_sd_case_wt_10_new,r_lb_sd_case_wt_10_new),
      list(combined_resid_filter_pd_c,combined_resid_filter_pd_r)) %>% 
   pmap(function(data1,data2){
     data1 %>% 
-      select(starts_with("chem")) %>% 
+      select(all_of(metal_name$chemcode)) %>% 
       map(~champ.DMP(beta = data2, pheno = .x, 
                      compare.group = NULL, 
                      adjPVal = 0.05, adjust.method = "BH", 
@@ -157,6 +247,11 @@ list(list(c_lb_sd_case_wt_10_new,r_lb_sd_case_wt_10_new),
 
 save(champ_dmplist_case_heavymetal_sig_c, file = "champ_dmplist_case_heavymetal_sig_c.RData")
 save(champ_dmplist_case_heavymetal_sig_r, file = "champ_dmplist_case_heavymetal_sig_r.RData")
+
+
+#Method 2: meffil
+
+
 
 
 # Annotation and GSEA -----------------------------------------------------
@@ -341,15 +436,15 @@ list(methylglm_pan_c, methylglm_pan_r) %>%
 
 
 #occupational
-list(quote_all(chem354,chem251,chem599),
-     quote_all(cg07699440, cg16282242, cg24896860))%>% 
+list(quote_all(chem151,chem155,chem156),
+     quote_all(cg06304546, cg07640233, cg04909336))%>% 
   pmap(function(chem,cpg){
     test <- champ_dmplist_case_heavymetal_sig_c[[chem]]
     test2 <- t(combined_resid_filter_pd_c %>% 
                  filter(rownames(.) %in% rownames(test))) %>% 
       as.data.frame()
     test3 <- cbind(c_lb_sd_case_wt_10_new %>% 
-                     dplyr::select(chem), test2)
+                     dplyr::select(all_of(chem)), test2)
     test3 %>% 
       dplyr::select(chem,cpg) %>% 
       ggplot(aes(x = test3[,1], y = test3[,2])) + 
@@ -379,15 +474,15 @@ list(quote_all(chem1876,chem1673,chem1638),
   })
 
 #residential
-list(quote_all(chem354,chem251,chem599),
-     quote_all(cg00540866, cg26842720, cg09010802))%>% 
+list(quote_all(chem151,chem155,chem156),
+     quote_all(cg22190861, cg09741070, cg26569590))%>% 
   pmap(function(chem,cpg){
     test <- champ_dmplist_case_heavymetal_sig_r[[chem]]
     test2 <- t(combined_resid_filter_pd_r %>% 
                  filter(rownames(.) %in% rownames(test))) %>% 
       as.data.frame()
     test3 <- cbind(r_lb_sd_case_wt_10_new %>% 
-                     dplyr::select(chem), test2)
+                     dplyr::select(all_of(chem)), test2)
     test3 %>% 
       dplyr::select(chem,cpg) %>% 
       ggplot(aes(x = test3[,1], y = test3[,2])) + 

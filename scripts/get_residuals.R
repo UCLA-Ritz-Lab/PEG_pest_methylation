@@ -22,8 +22,8 @@
 
 ## Y ~ covariates
 
-myvars_covar <- quote_all(cd8t, cd4t, gran, age, female,smokers,
-                         rfvotecaucasian2)
+myvars_covar <- quote_all(cd8t, cd4t, nk, mono, bcell, gran, age, female, 
+                          smokers, rfvotecaucasian2, study)
 #remove pdyears, a1_schyrs
 #stratify by pd status??
 

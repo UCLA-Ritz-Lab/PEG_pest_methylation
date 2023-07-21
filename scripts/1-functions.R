@@ -54,10 +54,10 @@ pacman::p_load(
   #"lme4",        #linear mixed-effects model: lmer()
   #"nlme",        #linear and nonlinear mixed effects:
   # "minfi",       #getBeta(), getSex()
-  "meffil",      #normalization: meffil.normalize.dataset(), ewas: meffil.ewas()
+  # "meffil",      #normalization: meffil.normalize.dataset(), ewas: meffil.ewas()
   # "DMRcate",      #For DMR analysis: dmrcate()
   # "WGCNA",       #weighted correlation network analysis: GOenrichmentAnalysis()
-  "ChAMP",       #champ.DMP(), champ.DMR()
+  # "ChAMP",       #champ.DMP(), champ.DMR()
   #"mixOmics",    #block.plsda()
   
   #For loading data

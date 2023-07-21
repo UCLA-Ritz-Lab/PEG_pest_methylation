@@ -25,7 +25,7 @@
 {
   heavy_metal <- chem_class %>% 
     filter(str_detect(`chem class (pan)`, "(?i)metal|copper")) %>% 
-    filter(chemcode %notin% c("chem1751"))
+    filter(chemcode %notin% c("chem1751", "chem153"))
   
   keyvars <- quote_all(pegid, smoker, age_diag, county, sex, race, 
                        minority, a1_schyrs, date_main_interview_collected)

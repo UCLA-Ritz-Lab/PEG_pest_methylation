@@ -56,7 +56,7 @@
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
     grep("filter_pd",., 
          value=TRUE, ignore.case = TRUE) %>%
-    keep(~!str_detect(.x,"win")) %>%
+    keep(~!str_detect(.x,"win|dmplist")) %>%
     map(.,load,.GlobalEnv)
 
   
