@@ -3,3 +3,8 @@
 .RData
 .Ruserdata
 .DS_Store
+/data
+/figures
+/dmr
+/reports
+/tables

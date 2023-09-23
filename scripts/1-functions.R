@@ -17,7 +17,7 @@ pacman::p_load(
   #For creating tables
   "kableExtra",  #create amazing tables: kbl()
   "skimr",       #summary statistics: skim()
-  "dataxray",    #explore data: report_xray()
+  #"dataxray",    #explore data: report_xray()
   "arsenal",     #create tables: tableby()
   "expss",       #create contingency tables: calc_cro_cpct()  
   "huxtable",    #as_hux_table()
@@ -45,7 +45,7 @@ pacman::p_load(
   # Other great packages
   "glue",        #replaces paste: glue()
   "Hmisc",       #explore the data: describe()
-  "mise",        #clear environment space: mise()
+  #"mise",        #clear environment space: mise()
   "gmodels",     #create contigency table: CrossTable()
   "meta",        #meta models: metagen()
   "codebook",    #amazing package to set labels: dict_to_list()
@@ -68,10 +68,11 @@ pacman::p_load(
   #For data manipulation
   "tidyverse"   #data manipulation and visualization:select(), mutate()
 )
+
 #invisible(lapply(paste0('package:', names(sessionInfo()$otherPkgs)), detach, character.only=TRUE, unload=TRUE))
 # if (!requireNamespace("BiocManager", quietly=TRUE))
 #   install.packages("BiocManager")
-# BiocManager::install("PANTHER.db")
+# BiocManager::install("methylGSA")
 # install.packages("devtools")
 # library(devtools)
 # install_github("perishky/meffil",force = TRUE)
@@ -91,8 +92,8 @@ pacman::p_load(
 
 # 4. clean env ------------------------------------------------------------
 
-mise()
-
+# mise()
+rm(list = ls())
 
 # 5. create functions -----------------------------------------------------
 
@@ -135,9 +136,19 @@ extreme_remove_percentile <- function(x) {
 
 ## 3. use percentile/thousands: winsorization
 extreme_remove_percentile_win <- function(x) {
-  Q = quantile(x, c(0.001, 0.999), na.rm = TRUE)
+  Q = quantile(x, c(0.1, 0.90), na.rm = TRUE)
   x = case_when(x < Q[1] ~ Q[1],
                 x > Q[2] ~ Q[2],
                 TRUE ~ x)
+}
+
+# an equivalent as the third function
+dec_out <- function(x, na.rm = TRUE) {
+  Q = quantile(x, c(0.05, 0.95), na.rm = na.rm)
+  id_p = x > Q[2]
+  id_n = x < Q[1]
+  x[id_p] = Q[2]
+  x[id_n] = Q[1]
+  return(x)
 }
 #--------------------------------End of the code--------------------------------
