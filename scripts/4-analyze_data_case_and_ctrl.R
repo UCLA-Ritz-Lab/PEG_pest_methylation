@@ -270,11 +270,15 @@ list(
   set_names("count_combine_case", "count_combine_ctrl") %>% 
   list2env(.GlobalEnv)
 
+count_combine_total <- list(count_combine_ctrl, count_combine_case) %>% 
+  bind_rows()
+
 hist(count_combine_case$total)
 hist(count_combine_ctrl$total)
+hist(count_combine_total$total)
 skim(count_combine_case$total)
 skim(count_combine_ctrl$total)
-
+skim(count_combine_total$total)
 
 plotlist <- c_lb_sd_case_wt_10_quantile %>% 
   select(starts_with("chem")) %>% 
@@ -367,6 +371,7 @@ list(
   set_names("covar_case","covar_ctrl") %>% 
   list2env(.,envir = .GlobalEnv)
 
+
 covar_case %>% 
   set_names("covar_case_c", "covar_case_r") %>% 
   list2env(.,envir = .GlobalEnv)
@@ -379,6 +384,17 @@ covar_ctrl %>%
   set_names("covar_ctrl_c", "covar_ctrl_r") %>% 
   list2env(.,envir = .GlobalEnv)
 
+
+covar_total <- list(
+  list(covar_ctrl[[2]], covar_case_r),
+  c("ctrl", "case")
+) %>% 
+  pmap(function(data1, data2){
+    data1 %>% 
+      mutate(pd = data2)
+  }) %>% 
+  bind_rows()
+
 ewas.parameters <- meffil.ewas.parameters(
   sig.threshold=1e-6,  ## EWAS p-value threshold
   max.plots=20, ## plot at most 20 CpG sites
@@ -386,9 +402,10 @@ ewas.parameters <- meffil.ewas.parameters(
   model="all") ## select default EWAS model; 
 
 
-list(list(count_combine_case, count_combine_ctrl),
-     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r),
-     list(covar_case_r, covar_ctrl_r)) %>% 
+list(list(count_combine_case, count_combine_ctrl, count_combine_total),
+     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+          peg_noob_nors_win_total),
+     list(covar_case_r, covar_ctrl_r, covar_total)) %>% 
   pmap(function(data1,data2,data3){
     data1 %>% 
       dplyr::select(total) %>% 
@@ -400,26 +417,31 @@ list(list(count_combine_case, count_combine_ctrl),
                         rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
                         random.seed = 20230922, lmfit.safer = F, verbose = T))
   }) %>% 
-  set_names("meffil_count_case","meffil_count_ctrl") %>% 
+  set_names("meffil_count_case","meffil_count_ctrl", "meffil_count_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 save(meffil_count_case, file = "meffil_count_case.RData")
 save(meffil_count_ctrl, file = "meffil_count_ctrl.RData")
+save(meffil_count_total, file = "meffil_count_total.RData")
 
-list(list(meffil_count_case, meffil_count_ctrl),
-     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r)) %>% 
+list(list(meffil_count_case, meffil_count_ctrl, meffil_count_total),
+     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+          peg_noob_nors_win_total)) %>% 
   pmap(function(meffil_list,data){
     meffil_list %>% 
       map(~ meffil.ewas.summary_fix(.x,data,
                                     parameters = ewas.parameters))
   }) %>% 
-  set_names("ewas.summary_count_case","ewas.summary_count_ctrl") %>% 
+  set_names("ewas.summary_count_case", "ewas.summary_count_ctrl", 
+            "ewas.summary_count_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 list(list(ewas.summary_count_case,
           names(ewas.summary_count_case), "case"),
      list(ewas.summary_count_ctrl,
-          names(ewas.summary_count_ctrl), "ctrl")) %>%
+          names(ewas.summary_count_ctrl), "ctrl"),
+     list(ewas.summary_count_total,
+          names(ewas.summary_count_total), "total")) %>%
   map(function(datalist){
     datalist %>%
       pmap(function(data1, data2, data3){
@@ -429,7 +451,7 @@ list(list(ewas.summary_count_case,
             "reports", data3, paste(data2, data3, ".html", sep = "_")))
       })
   })
-meffil.
+
 # DMR analysis ------------------------------------------------------------
 
 
@@ -515,7 +537,7 @@ DMR.GUI(DMR  = dmr_evernever_c[[3]],
 
 # GESA analysis -----------------------------------------------------------
 
-list(meffil_count_case, meffil_count_ctrl) %>% 
+list(meffil_count_case, meffil_count_ctrl, meffil_count_total) %>% 
   map(function(meffil_list){
     meffil_list %>% 
       map(function(data){
@@ -524,7 +546,8 @@ list(meffil_count_case, meffil_count_ctrl) %>%
           mutate(cpgs = row.names(.))
       })
   }) %>% 
-  set_names("metal_meffil_case", "metal_meffil_control") %>% 
+  set_names("metal_meffil_case", "metal_meffil_control", 
+            "metal_meffil_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
@@ -532,7 +555,7 @@ library(IlluminaHumanMethylation450kmanifest)
 
 ann450k <- getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 
-list(metal_meffil_case, metal_meffil_control) %>% 
+list(metal_meffil_case, metal_meffil_control, metal_meffil_total) %>% 
   map(function(data){
     data %>% 
       map(function(df){
@@ -540,27 +563,29 @@ list(metal_meffil_case, metal_meffil_control) %>%
                               c(1:4,12:19,24:ncol(ann450k))])
       })
   }) %>% 
-  set_names("ann450ksubt_case","ann450ksubt_ctrl") %>% 
+  set_names("ann450ksubt_case","ann450ksubt_ctrl", "ann450ksubt_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 list(list(metal_meffil_case, ann450ksubt_case),
-     list(metal_meffil_control, ann450ksubt_ctrl)) %>% 
+     list(metal_meffil_control, ann450ksubt_ctrl),
+     list(metal_meffil_total, ann450ksubt_total)) %>% 
   map(function(data){
     data %>% 
       pmap(function(data1,data2){
         cbind(data1,data2)
       })
   }) %>% 
-  set_names("ewas_annot_case","ewas_annot_ctrl") %>% 
+  set_names("ewas_annot_case", "ewas_annot_ctrl", "ewas_annot_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
-list(ewas_annot_case, ewas_annot_ctrl) %>% 
+list(ewas_annot_case, ewas_annot_ctrl, ewas_annot_total) %>% 
   map(function(plist){
     plist[[1]] %>% 
       filter(fdr < 0.05)
   }) %>% 
-  set_names("ewas_annot_new_case","ewas_annot_new_ctrl") %>% 
+  set_names("ewas_annot_new_case","ewas_annot_new_ctrl", 
+            "ewas_annot_new_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 library(methylGSA)
@@ -616,7 +641,7 @@ methylglm_path_case <- methylglm_pan_case %>%
 
 library(ggtext)
 
-list(meffil_count_case, meffil_count_ctrl) %>% 
+list(meffil_count_case, meffil_count_ctrl, meffil_count_total) %>% 
   map(function(meffil_list){
     meffil_list %>% 
       #keep(., map_lgl(., ~ nrow(.x)>=300)) %>% 
@@ -638,10 +663,10 @@ list(meffil_count_case, meffil_count_ctrl) %>%
         datanew
       })
   }) %>% 
-  set_names("metal_list_case","metal_list_ctrl") %>% 
+  set_names("metal_list_case","metal_list_ctrl", "metal_list_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
-list(metal_list_case, metal_list_ctrl) %>% 
+list(metal_list_case, metal_list_ctrl, metal_list_total) %>% 
   map(function(metal_list){
     metal_list %>% 
       map(function(data){
@@ -651,26 +676,27 @@ list(metal_list_case, metal_list_ctrl) %>%
           ungroup()
       })
   }) %>% 
-  set_names("axis_set_case", "axis_set_ctrl") %>% 
+  set_names("axis_set_case", "axis_set_ctrl", "axis_set_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
-list(metal_list_case, metal_list_control) %>% 
+list(metal_list_case, metal_list_ctrl, metal_list_total) %>% 
   map(function(metal_list){
     metal_list %>% 
       map(function(data){
         data %>% 
           filter(p.value == min(p.value)) %>% 
-          mutate(ylim = abs(floor(log10(p.value))) + 2) %>% 
+          mutate(ylim = abs(floor(log10(p.value))) + 1) %>% 
           pull(ylim)
       })
   }) %>% 
-  set_names("ylim_case","ylim_ctrl") %>% 
+  set_names("ylim_case","ylim_ctrl", "ylim_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
 list(list(metal_list_case, axis_set_case, ylim_case),
-     list(metal_list_ctrl, axis_set_ctrl, ylim_ctrl)) %>% 
+     list(metal_list_ctrl, axis_set_ctrl, ylim_ctrl),
+     list(metal_list_total, axis_set_total, ylim_total)) %>% 
   map(function(datalist){
     datalist %>% 
       pmap(function(pest, axis, ylim){
@@ -699,20 +725,21 @@ list(list(metal_list_case, axis_set_case, ylim_case),
           )
       })
   }) %>% 
-  set_names("manhattanlist_case","manhattanlist_ctrl") %>% 
+  set_names("manhattanlist_case","manhattanlist_ctrl","manhattanlist_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 plotlist <- list(manhattanlist_case[[1]], 
-                 manhattanlist_ctrl[[1]])
+                 manhattanlist_ctrl[[1]], 
+                 manhattanlist_total[[1]])
 
-plot_label <- c("case", "control")
+plot_label <- c("case", "control", "total")
 
 #print all plots in one figure
 png(file=here::here("figures","manhattan plots for cases and controls.png"), 
     width = 1920, height = 1080)
 ggarrange(plotlist = plotlist,
           labels = plot_label,
-          ncol = 2, nrow = 1)
+          ncol = 3, nrow = 1)
 dev.off()
 
 ##### Legacy code ----------

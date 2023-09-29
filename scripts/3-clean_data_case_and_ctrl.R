@@ -510,14 +510,14 @@ list(
                               "chem353", "chem354")) %>%
     pull(chemcode) 
   
-  metal_name <- str_sort(metal_filter) %>% 
-    map(function(chem){
-      heavy_metal %>% 
-        filter(chemcode %in% chem) %>% 
-        filter(chemcode %notin% c("chem1638", "chem164", "chem283", 
-                                  "chem353", "chem354"))
-    }) %>% 
-    rbindlist()
+  # metal_name <- str_sort(metal_filter) %>% 
+  #   map(function(chem){
+  #     heavy_metal %>% 
+  #       filter(chemcode %in% chem) %>% 
+  #       filter(chemcode %notin% c("chem1638", "chem164", "chem283", 
+  #                                 "chem353", "chem354"))
+  #   }) %>% 
+  #   rbindlist()
 
   chem_todrop_case <- setdiff(heavy_metal$chemcode, metal_filter_case)
   chem_todrop_ctrl <- setdiff(heavy_metal$chemcode, metal_filter_ctrl)
@@ -638,6 +638,13 @@ list(
             "sampleid_ctrl_c","sampleid_ctrl_r") %>% 
   list2env(.,envir = .GlobalEnv)
 
+peg_noob_nors_win_total <- list(PEG_NOOB_nors_win_filter_ctrl_r, 
+                                PEG_NOOB_nors_win_filter_pd_r) %>% 
+  bind_cols()
+
+
+
+# names(peg_noob_nors_win_total)
 
 names(combined_resid_filter_pd_c) <- sampleid_pd_c
 names(combined_resid_filter_pd_r) <- sampleid_pd_r
