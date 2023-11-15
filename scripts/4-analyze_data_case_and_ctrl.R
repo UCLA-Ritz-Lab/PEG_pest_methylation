@@ -25,11 +25,13 @@ myvar <- quote_all(pegid,sampleid,age, pd_new,female,
                    pdstudystudy,meanmethbysample)
 
 
-list(c_lb_sd_case_wt_10_ztrans,
-     r_lb_sd_case_wt_10_ztrans) %>% 
+list(c_lb_sd_case_wt_10_count,
+     r_lb_sd_case_wt_10_count,
+     c_lb_sd_control_wt_10_count,
+     r_lb_sd_control_wt_10_count) %>% 
   map(function(data){
     data %>% 
-      select(all_of(myvar))
+      dplyr::select(all_of(myvar))
   }) %>% 
   rbindlist() %>% 
   set_variable_labels(
@@ -47,7 +49,7 @@ list(c_lb_sd_case_wt_10_ztrans,
   ) %>% 
   distinct() %>% 
   #filter(pegid %in% datSampleSteve$externaldnacode) %>% 
-  select(-c(sampleid,pegid, pd_new)) %>%
+  dplyr::select(-c(sampleid,pegid, pd_new)) %>%
   tbl_summary(missing = "no",
               #type=list(c(female) ~ "categorical"),
               statistic = list(all_continuous() ~ "{mean} ({sd})",
@@ -260,12 +262,13 @@ list(
     datalist %>% 
       map(function(data){
         data %>% 
-          select(pegid, metal_count)
+          dplyr::select(pegid, metal_count, copper_count)
       }) %>% 
       purrr::reduce(full_join, by = "pegid") %>% 
       mutate_all(~replace(., is.na(.), 0)) %>% 
       transmute(pegid = pegid,
-                  total = metal_count.x + metal_count.y)
+                  total = metal_count.x + metal_count.y,
+                copper = copper_count.x + copper_count.y)
   }) %>% 
   set_names("count_combine_case", "count_combine_ctrl") %>% 
   list2env(.GlobalEnv)
@@ -273,21 +276,21 @@ list(
 count_combine_total <- list(count_combine_ctrl, count_combine_case) %>% 
   bind_rows()
 
-hist(count_combine_case$total)
+hist(count_combine_case$copper)
 hist(count_combine_ctrl$total)
 hist(count_combine_total$total)
-skim(count_combine_case$total)
+skim(count_combine_case$copper)
 skim(count_combine_ctrl$total)
 skim(count_combine_total$total)
 
-plotlist <- c_lb_sd_case_wt_10_quantile %>% 
-  select(starts_with("chem")) %>% 
-  map(function(data){
-    data %>% 
-    ggplot(aes(x = ., fill = .)) +
-      scale_fill_colorblind() +
-      geom_bar()
-  })
+# plotlist <- c_lb_sd_case_wt_10_quantile %>% 
+#   select(starts_with("chem")) %>% 
+#   map(function(data){
+#     data %>% 
+#     ggplot(aes(x = ., fill = .)) +
+#       scale_fill_colorblind() +
+#       geom_bar()
+#   })
 
 list(
   list(count_combine_case, count_combine_ctrl),
@@ -359,7 +362,7 @@ list(
     datalist %>% 
       map(function(data){
         data %>% 
-          select(all_of(myvars_ewas)) %>% 
+          dplyr::select(all_of(myvars_ewas)) %>% 
           # rename(pdyears = pdstudynumberyearswithpdatbloodd) %>% 
           # mutate(pdyears = ifelse(is.na(pdyears), 
           #                         mean(pdyears, na.rm=TRUE), pdyears)) %>% 
@@ -408,7 +411,7 @@ list(list(count_combine_case, count_combine_ctrl, count_combine_total),
      list(covar_case_r, covar_ctrl_r, covar_total)) %>% 
   pmap(function(data1,data2,data3){
     data1 %>% 
-      dplyr::select(total) %>% 
+      dplyr::select(total, copper) %>% 
       map(~meffil.ewas( beta=as.matrix(data2), 
                         variable=.x, covariates = data3, 
                         batch = NULL, weights = NULL,  cell.counts = NULL,
@@ -419,6 +422,9 @@ list(list(count_combine_case, count_combine_ctrl, count_combine_total),
   }) %>% 
   set_names("meffil_count_case","meffil_count_ctrl", "meffil_count_total") %>% 
   list2env(.,envir = .GlobalEnv)
+
+test <- meffil_count_total$copper$analyses$all$table %>% 
+  filter(-log10(p.value) > 6)
 
 save(meffil_count_case, file = "meffil_count_case.RData")
 save(meffil_count_ctrl, file = "meffil_count_ctrl.RData")
@@ -581,8 +587,8 @@ list(list(metal_meffil_case, ann450ksubt_case),
 
 list(ewas_annot_case, ewas_annot_ctrl, ewas_annot_total) %>% 
   map(function(plist){
-    plist[[1]] %>% 
-      filter(fdr < 0.05)
+    plist %>% 
+      map(~filter(.x, fdr < 0.05))
   }) %>% 
   set_names("ewas_annot_new_case","ewas_annot_new_ctrl", 
             "ewas_annot_new_total") %>% 
@@ -591,14 +597,36 @@ list(ewas_annot_case, ewas_annot_ctrl, ewas_annot_total) %>%
 library(methylGSA)
 
 meta.cpg_case <- ewas_annot_new_case %>% 
-  pull(p.value) %>% 
-  set_names(ewas_annot_new_case$cpgs)
+  map(function(data){
+    data %>% 
+      pull(p.value) %>% 
+      set_names(data$cpgs)
+  })
+
+meta.cpg_total <- ewas_annot_new_total %>% 
+  map(function(data){
+    data %>% 
+      pull(p.value) %>% 
+      set_names(data$cpgs)
+  })
+
+meta.cpg_case %>% 
+  set_names("meta.cpg_case_total", "meta.cpg_case_copper") %>% 
+  list2env(.,envir = .GlobalEnv)
+
+meta.cpg_total %>% 
+  set_names("meta.cpg_total_total", "meta.cpg_total_copper") %>% 
+  list2env(.,envir = .GlobalEnv)
 
 
 #function 2: methylRRA
-gsea_case <- methylRRA(cpg.pval = meta.cpg_case, method = "GSEA")
+gsea_case_total <- methylRRA(cpg.pval = meta.cpg_case_total, method = "GSEA")
+gsea_case_copper <- methylRRA(cpg.pval = meta.cpg_case_copper, method = "GSEA")
+gsea_total_copper <- methylRRA(cpg.pval = meta.cpg_total_copper, method = "GSEA")
 
-barplot(gesa_case, num = 10, colorby = "pvalue")
+barplot(gsea_case_total, num = 10, colorby = "pvalue")
+barplot(gsea_case_copper, num = 10, colorby = "pvalue")
+barplot(gsea_total_copper, num = 10, colorby = "pvalue")
 
 # Pathway analysis --------------------------------------------------------
 
@@ -615,9 +643,11 @@ lengths(panther)
 
 #ALL CpG sites
 #GSEA for panther pathways
-methylglm_pan_case <- methylglm(cpg.pval = meta.cpg_case, 
+methylglm_pan_case <- methylglm(cpg.pval = meta.cpg_case_copper, 
                                 GS.list = panther, GS.idtype = "ENTREZID")
 
+methylglm_pan_total <- methylglm(cpg.pval = meta.cpg_total_copper, 
+                                GS.list = panther, GS.idtype = "ENTREZID")
 
 #get pathway names
 cols <- "PATHWAY_TERM"
@@ -635,7 +665,8 @@ panther.names <- res.p %>%
 methylglm_path_case <- methylglm_pan_case %>% 
   left_join(panther.names, by = "ID")
 
-
+methylglm_path_total <- methylglm_pan_total %>% 
+  left_join(panther.names, by = "ID")
 
 # Visulization ------------------------------------------------------------
 
@@ -728,19 +759,41 @@ list(list(metal_list_case, axis_set_case, ylim_case),
   set_names("manhattanlist_case","manhattanlist_ctrl","manhattanlist_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
-plotlist <- list(manhattanlist_case[[1]], 
-                 manhattanlist_ctrl[[1]], 
-                 manhattanlist_total[[1]])
+plotlist <- list(manhattanlist_case[[2]], 
+                 manhattanlist_ctrl[[2]], 
+                 manhattanlist_total[[2]])
 
 plot_label <- c("case", "control", "total")
 
 #print all plots in one figure
-png(file=here::here("figures","manhattan plots for cases and controls.png"), 
+png(file=here::here("figures","manhattan plots for cases and controls_copper.png"), 
     width = 1920, height = 1080)
 ggarrange(plotlist = plotlist,
           labels = plot_label,
           ncol = 3, nrow = 1)
 dev.off()
+
+
+#scatter plot
+
+list(quote_all(total, copper),
+     quote_all(cg11208322, cg11208322))%>% 
+  pmap(function(chem,cpg){
+    test <- meffil_count_case[[chem]]$analyses$all$table
+    test2 <- t(PEG_NOOB_nors_win_filter_pd_r %>% 
+                 filter(rownames(.) %in% rownames(test))) %>% 
+      as.data.frame()
+    test3 <- cbind(count_combine_case %>% 
+                     dplyr::select(chem), test2)
+    test3 %>% 
+      dplyr::select(chem,cpg) %>% 
+      ggplot(aes(x = test3[,1], y = test3[,2])) + 
+      geom_point() +
+      geom_smooth(method = "lm") +
+      stat_cor(label.y = 0.96)+
+      labs(x = chem,
+           y = cpg)
+  })
 
 ##### Legacy code ----------
 

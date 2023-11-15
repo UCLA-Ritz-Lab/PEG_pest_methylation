@@ -151,4 +151,39 @@ dec_out <- function(x, na.rm = TRUE) {
   x[id_n] = Q[1]
   return(x)
 }
+
+# different data processing methods
+create_quantile <- function(data){
+  data %>% 
+    mutate_at(vars(starts_with("chem")), 
+              ~if_else(.x > quantile(.x, 
+                                     c(0.25, 0.75), na.rm = TRUE)[2], 
+                       "high", "low"))
+}
+
+create_evernever <- function(data){
+  data %>% 
+    mutate_at(vars(starts_with("chem")), 
+              ~if_else(.x > 0, "ever", "never"))
+}
+
+
+create_ztrans <- function(data){
+  data %>% 
+    mutate_at(vars(starts_with("chem")),
+              ~scale(., center = TRUE)
+              %>% as.vector())
+}
+
+create_counts <- function(data){
+  data %>% 
+    mutate(metal_count = rowSums(
+      select(., starts_with("chem")) > 0),
+      copper_count = rowSums(
+        select(., matches(chem_copper)) > 0),
+    ) %>% 
+    select(-starts_with("chem")) %>% 
+    relocate(pegid, metal_count, copper_count)
+}
+
 #--------------------------------End of the code--------------------------------
