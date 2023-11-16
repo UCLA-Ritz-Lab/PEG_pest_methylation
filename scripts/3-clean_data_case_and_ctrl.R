@@ -23,9 +23,15 @@
 #1. Get the clean peg_cov & peg_keyvar data
 
 {
-  heavy_metal <- chem_class %>% 
-    filter(str_detect(`chem class (pan)`, "(?i)metal|copper")) %>% 
-    filter(chemcode %notin% c("chem1751", "chem153"))
+  list("(?i)metal|copper", "(?i)Organophosphorus") %>% 
+    map(function(data){
+      chem_class %>% 
+        filter(str_detect(`chem class (pan)`, data)) %>% 
+        filter(chemcode %notin% c("chem1751", "chem153"))
+    }) %>% 
+    set_names("heavy_metal", "chem_op") %>% 
+    list2env(.GlobalEnv)
+  
   
   keyvars <- quote_all(pegid, smoker, age_diag, county, sex, race, 
                        minority, a1_schyrs, date_main_interview_collected)
@@ -40,7 +46,7 @@
     }) %>% 
     bind_rows() %>% 
     distinct() %>% 
-    dplyr::rename(smokers = smoker) %>% 
+    rename(smokers = smoker) %>% 
     set_variable_labels(
       pegid = "PEGID",
       sex = "Gender",
@@ -103,16 +109,15 @@ peg_keyvars %>%
   set_names("pest_case", "pest_control") %>% 
   list2env(.GlobalEnv)
 
-list(
+pest_methylation_clean <- list(
   list(pest_case, pest_control),
   list(case_ids, control_ids)
 ) %>% 
   pmap(function(data1, data2){
     data1 %>% 
       filter(pegid %in% data2$pegid)
-  }) %>% 
-  set_names("pest_case_methylation", "pest_control_methylation") %>% 
-  list2env(.GlobalEnv)
+  })
+
 
   
   # summary(pest_case_methylation$sex)
@@ -145,7 +150,7 @@ list(
   
   list(c_grape_out,r_grape_out) %>% 
     map(function(data){
-      list(pest_case_methylation, pest_control_methylation) %>% 
+      pest_methylation_clean %>% 
         map(function(df){
           data %>% 
             inner_join(df %>% 
@@ -166,7 +171,7 @@ list(
   #pull in input to get unexposed and limit to 1974-indexyr
   # merge each dataframe from two lists and add zero for unexposed
   list(
-    list(pest_case_methylation,pest_control_methylation),
+    pest_methylation_clean,
     c_grape_agg,
     r_grape_agg
   ) %>% 
@@ -197,7 +202,7 @@ list(
   
   # Calculate lagged years
   
-  list(pest_case_methylation, pest_control_methylation) %>% 
+  pest_methylation_clean %>% 
     map(function(df){
       list(list(c_grape_in,r_grape_in),
            c("c","r")) %>% 
@@ -247,7 +252,7 @@ list(
   list(
     list(case_agg_yr_all[[1]], control_agg_yr_all[[1]]),
     list(case_agg_yr_all[[2]], control_agg_yr_all[[2]]),
-    list(pest_case_methylation, pest_control_methylation)
+    pest_methylation_clean
   ) %>% 
     pmap(function(data1, data2, data3){
       list(data1,data2) %>% 
@@ -266,14 +271,18 @@ list(
     set_names("exp_window_address_case", "exp_window_address_control") %>% 
     list2env(.GlobalEnv)
   
-
+  exp_window_address_all_list <- list(exp_window_address_case, 
+                                      exp_window_address_control) %>% 
+    pmap(function(data1, data2){
+      rbind(data1, data2)
+    })
   
   list(
     list(exp_window_address_case[[1]], exp_window_address_control[[1]]),
     list(exp_window_address_case[[2]], exp_window_address_control[[2]]),
     list(exp_yrs_lag_case_list[[1]], exp_yrs_lag_control_list[[1]]),
     list(exp_yrs_lag_case_list[[2]], exp_yrs_lag_control_list[[2]]),
-    list(pest_case_methylation, pest_control_methylation)
+    pest_methylation_clean
   ) %>% 
     pmap(function(df1, df2, df3, df4, df5){
       list(list(df1, df2),
@@ -305,7 +314,7 @@ list(
     list(exp_window_address_case[[2]], exp_window_address_control[[2]]),
     list(exp_yrs_lag_case_list[[1]], exp_yrs_lag_control_list[[1]]),
     list(exp_yrs_lag_case_list[[2]], exp_yrs_lag_control_list[[2]]),
-    list(pest_case_methylation, pest_control_methylation)
+    pest_methylation_clean
   ) %>% 
     pmap(function(df1, df2, df3, df4, df5){
       list(list(df1, df2),
@@ -347,125 +356,133 @@ list(
                       cd8t,cd4t,nk,bcell,mono,gran,pdstudystudy,
                       pdstudydiseasestatus)
   
-  list(
-    list(exp_lb_case_wt[[1]], exp_lb_control_wt[[1]]),
-    list(exp_lb_case_wt[[2]], exp_lb_control_wt[[2]]),
-    list(pest_case_methylation, pest_control_methylation)
-  ) %>% 
-    pmap(function(df1, df2, df3){
-      list(df1, df2) %>% 
-        map(function(data){
-          data %>% 
-            select(pegid,chemcode,chemuse_wt_10) %>% 
-            pivot_wider(
-              id_cols = pegid,
-              names_from = chemcode,
-              values_from = chemuse_wt_10
-            ) %>% 
-            select(pegid, any_of(heavy_metal$chemcode)) %>% 
-            full_join(datSamplePEG %>%
-                        select(all_of(myvar1)), by = "pegid") %>%
-            left_join(datSampleSteve %>%
-                        select(all_of(myvar2)),
-                      by = "sampleid") %>% 
-            right_join(df3, by = "pegid") %>% 
-            mutate(
-              rfvotecaucasian2 = case_when(
-              (is.na(rfvotecaucasian) & race == 1) | 
-                (is.na(rfvotecaucasian) & 
-                   aim_self_ethnicity == "Caucasian") ~ 1,
-              is.na(rfvotecaucasian) ~ 0.5,
-              TRUE ~ rfvotecaucasian),
-              ethnicity = case_when(
-                is.na(aim_self_ethnicity) | 
-                  aim_self_ethnicity == "Asian" ~ "Other",
-                TRUE ~ aim_self_ethnicity),
-              caucasian = if_else(ethnicity == "Caucasian",0,1),
-              gds1_5 = if_else(gds1<5,0,1),
-              c11_3 = case_when(
-                c11_depression == 0 ~ 0,
-                c11_depression == 1 & (c11_depressionage < age_diag-4) ~ 2,
-                TRUE ~ 1),
-              gds5_pd = if_else(
-                pd_new == "With PD", 1 + gds1_5, 0),
-              c11_3m = if_else(
-                pd_new == "With PD", 1 + c11_3, 0),
-              c11_2 = if_else(
-                pd_new == "With PD", 1 + c11_depression, 0),
-              nlr = gran/(cd8t + cd4t + nk + bcell + mono)
-              ) %>% 
-            set_value_labels(
-              female = c("Male"=0, "Female"=1)) %>% 
-            modify_if(is.labelled, to_factor) %>% 
-            mutate_at(vars(county), fct_drop) 
+  list(heavy_metal$chemcode, chem_op$chemcode) %>% 
+    map(function(chemlist){
+      list(
+        list(exp_lb_case_wt[[1]], exp_lb_control_wt[[1]]),
+        list(exp_lb_case_wt[[2]], exp_lb_control_wt[[2]]),
+        pest_methylation_clean
+      ) %>% 
+        pmap(function(df1, df2, df3){
+          list(df1, df2) %>% 
+            map(function(data){
+              data %>% 
+                select(pegid,chemcode,chemuse_wt_10) %>% 
+                pivot_wider(
+                  id_cols = pegid,
+                  names_from = chemcode,
+                  values_from = chemuse_wt_10
+                ) %>% 
+                select(pegid, any_of(chemlist)) %>% 
+                full_join(datSamplePEG %>%
+                            select(all_of(myvar1)), by = "pegid") %>%
+                left_join(datSampleSteve %>%
+                            select(all_of(myvar2)),
+                          by = "sampleid") %>% 
+                right_join(df3, by = "pegid") %>% 
+                mutate(
+                  rfvotecaucasian2 = case_when(
+                    (is.na(rfvotecaucasian) & race == 1) | 
+                      (is.na(rfvotecaucasian) & 
+                         aim_self_ethnicity == "Caucasian") ~ 1,
+                    is.na(rfvotecaucasian) ~ 0.5,
+                    TRUE ~ rfvotecaucasian),
+                  ethnicity = case_when(
+                    is.na(aim_self_ethnicity) | 
+                      aim_self_ethnicity == "Asian" ~ "Other",
+                    TRUE ~ aim_self_ethnicity),
+                  caucasian = if_else(ethnicity == "Caucasian",0,1),
+                  gds1_5 = if_else(gds1<5,0,1),
+                  c11_3 = case_when(
+                    c11_depression == 0 ~ 0,
+                    c11_depression == 1 & (c11_depressionage < age_diag-4) ~ 2,
+                    TRUE ~ 1),
+                  gds5_pd = if_else(
+                    pd_new == "With PD", 1 + gds1_5, 0),
+                  c11_3m = if_else(
+                    pd_new == "With PD", 1 + c11_3, 0),
+                  c11_2 = if_else(
+                    pd_new == "With PD", 1 + c11_depression, 0),
+                  nlr = gran/(cd8t + cd4t + nk + bcell + mono)
+                ) %>% 
+                set_value_labels(
+                  female = c("Male"=0, "Female"=1)) %>% 
+                modify_if(is.labelled, to_factor) %>% 
+                mutate_at(vars(county), fct_drop) 
+            }) 
         }) 
     }) %>% 
-    set_names("lb_sd_case_wt_10", "lb_sd_control_wt_10") %>% 
+    set_names("lb_sd_metal_wt_10", "lb_sd_op_wt_10") %>% 
     list2env(.GlobalEnv)
   
   
   #calculate the n and % of exposure for each chemical: combine
-  list(
-    list(
-      lb_sd_case_wt_10,
-      lb_sd_control_wt_10
-    ),
-    list(569, 237)
-  ) %>% 
-    pmap(function(data1,data2){
-      data1 %>% 
-        map(function(data){
-          data %>% 
-            dplyr::select(pegid,starts_with("chem")) 
-        }) %>% 
-        bind_rows() %>% 
-        distinct() %>% 
-        group_by(pegid) %>% 
-        summarise_all(sum, na.rm=T) %>% 
-        pivot_longer(
-          cols = starts_with("chem"),
-          names_to = c("chemcode"),
-          values_to = "duration") %>% 
-        mutate(dur_ind=if_else(duration>0,1,0)) %>% 
-        group_by(chemcode) %>% 
-        summarise(n_exp = sum(dur_ind),
-                  .groups = "keep") %>% 
-        mutate(pct = n_exp/data2) %>% 
-        left_join(chemlist_new, by="chemcode") %>% 
-        left_join(chem_class, by = c("chemname","chemcode")) %>% 
-        relocate(chemname, chemcode, `chem class (pan)`)
+  list(lb_sd_metal_wt_10, lb_sd_op_wt_10) %>% 
+    map(function(df){
+      list(
+        df,
+        list(569, 237)
+      ) %>% 
+        pmap(function(data1,data2){
+          data1 %>% 
+            map(function(data){
+              data %>% 
+                dplyr::select(pegid,starts_with("chem")) 
+            }) %>% 
+            bind_rows() %>% 
+            distinct() %>% 
+            group_by(pegid) %>% 
+            summarise_all(sum, na.rm=T) %>% 
+            pivot_longer(
+              cols = starts_with("chem"),
+              names_to = c("chemcode"),
+              values_to = "duration") %>% 
+            mutate(dur_ind=if_else(duration>0,1,0)) %>% 
+            group_by(chemcode) %>% 
+            summarise(n_exp = sum(dur_ind),
+                      .groups = "keep") %>% 
+            mutate(pct = n_exp/data2) %>% 
+            left_join(chemlist_new, by="chemcode") %>% 
+            left_join(chem_class, by = c("chemname","chemcode")) %>% 
+            relocate(chemname, chemcode, `chem class (pan)`)
+        }) 
     }) %>% 
-    set_names("dur_long_combine_case", 
-              "dur_long_combine_control") %>% 
+    set_names("dur_long_combine_metal_list", 
+              "dur_long_combine_op_list") %>% 
     list2env(.GlobalEnv)
 
-  setdiff(dur_long_combine_case$chemcode, 
-          dur_long_combine_control$chemcode)
   
-  dur_long_combine <- list(dur_long_combine_case, 
-                           dur_long_combine_control) %>% 
-    map(function(data){
-      data %>% 
-        select(-c(pct, `chem class (pan)`))
+  list(dur_long_combine_metal_list, dur_long_combine_op_list) %>% 
+    map(function(df){
+      df %>% 
+        map(function(data){
+          data %>% 
+            select(-c(pct, `chem class (pan)`))
+        }) %>% 
+        reduce(inner_join, by = c("chemname", "chemcode")) %>% 
+        rename(case = n_exp.x,
+               ctrl = n_exp.y) %>% 
+        mutate(n_exp = case + ctrl,
+               pct = n_exp/806) %>% 
+        left_join(chem_class, by = c("chemname","chemcode")) %>% 
+        relocate(chemname,chemcode,`chem class (pan)`)
     }) %>% 
-    reduce(inner_join, by = c("chemname", "chemcode")) %>% 
-    rename(case = n_exp.x,
-           ctrl = n_exp.y) %>% 
-    mutate(n_exp = case + ctrl,
-           pct = n_exp/806) %>% 
-    left_join(chem_class, by = c("chemname","chemcode")) %>% 
-    relocate(chemname,chemcode,`chem class (pan)`)
+    set_names("dur_long_combine_metal", 
+              "dur_long_combine_op") %>% 
+    list2env(.GlobalEnv)
   
-  list(dur_long_combine_case, dur_long_combine_control) %>% 
-    map(function(data){
-      data %>% 
+  
+  list(dur_long_combine_metal, dur_long_combine_op) %>% 
+    map(function(df){
+      df %>% 
         filter(n_exp >= 30) %>%
         filter(chemcode %notin% c("chem1638", "chem164", "chem283",
                                   "chem353", "chem354")) %>%
         pull(chemcode) 
     }) %>% 
-    set_names("metal_filter_case", "metal_filter_ctrl") %>% 
+    set_names("metal_filter", "op_filter") %>% 
     list2env(.GlobalEnv)
+  
 
   
   # metal_name <- str_sort(metal_filter) %>% 
@@ -476,11 +493,8 @@ list(
   #                                 "chem353", "chem354"))
   #   }) %>% 
   #   rbindlist()
-
-  chem_todrop_case <- setdiff(heavy_metal$chemcode, metal_filter_case)
-  chem_todrop_ctrl <- setdiff(heavy_metal$chemcode, metal_filter_ctrl)
-  
-  setdiff(metal_filter_case, metal_filter_ctrl)
+  metal_todrop <- setdiff(heavy_metal$chemcode, metal_filter)
+  op_todrop <- setdiff(chem_op$chemcode, op_filter)
   
   # setdiff(names(r_lb_sd_case_wt_10), names(c_lb_sd_case_wt_10))
   
@@ -494,88 +508,93 @@ list(
     filter(str_detect(chemname, "(?i)copper")) %>% 
     pull(chemcode)
   
-  list(create_quantile, create_evernever, 
-       create_ztrans, create_counts) %>% 
-    map(function(method){
-      list(
-        list(lb_sd_case_wt_10[[1]], lb_sd_control_wt_10[[1]]),
-        list(lb_sd_case_wt_10[[2]], lb_sd_control_wt_10[[2]]),
-        list(chem_todrop_case, chem_todrop_ctrl)
-      ) %>% 
-        pmap(function(df1, df2, df3){
+  
+  list(
+    list(lb_sd_metal_wt_10, lb_sd_op_wt_10),
+    list(metal_todrop, op_todrop)
+  ) %>% 
+    pmap(function(df, chem){
+      list(create_quantile, create_evernever, 
+           create_ztrans, create_counts) %>% 
+        map(function(method){
           list(
-            list(df1, df2),
-            list(id_remove_c, id_remove_r)
+            df %>% 
+              map(function(data){
+                data[[1]]
+              }),
+            df %>% 
+              map(function(data){
+                data[[2]]
+              }),
+            list(chem, chem)
           ) %>% 
-            pmap(function(data1, data2){
-              data1 %>% 
-                select(-any_of(df3)) %>%
-                filter(pegid %notin% data2 & !is.na(pegid)) %>%
-                mutate_at(vars(starts_with("chem")), 
-                          ~extreme_remove_percentile_win(.x)) %>%
-                mutate_at(vars(starts_with("chem")),
-                          ~replace(., is.na(.)|!is.finite(.), 0) 
-                          %>% as.vector()) %>% 
-                method
+            pmap(function(df1, df2, df3){
+              list(
+                list(df1, df2),
+                list(id_remove_c, id_remove_r)
+              ) %>% 
+                pmap(function(data1, data2){
+                  data1 %>% 
+                    select(-any_of(df3)) %>%
+                    filter(pegid %notin% data2 & !is.na(pegid)) %>%
+                    mutate_at(vars(starts_with("chem")), 
+                              ~extreme_remove_percentile_win(.x)) %>%
+                    mutate_at(vars(starts_with("chem")),
+                              ~replace(., is.na(.)|!is.finite(.), 0) 
+                              %>% as.vector()) %>% 
+                    method
+                }) 
             }) 
         }) 
     }) %>% 
-    set_names("lb_sd_wt_10_quantile", 
-              "lb_sd_wt_10_evernever",
-              "lb_sd_wt_10_ztrans",
-              "lb_sd_wt_10_count") %>% 
+    set_names("lb_sd_metal_wt_10_processed", 
+              "lb_sd_op_wt_10_processed") %>% 
     list2env(.GlobalEnv)
   
+  # lb_sd_metal_wt_10_processed %>% 
+  #   set_names("lb_sd_wt_10_quantile_metal", 
+  #             "lb_sd_wt_10_evernever_metal",
+  #             "lb_sd_wt_10_ztrans_metal",
+  #             "lb_sd_wt_10_count_win_metal") %>% 
+  #   list2env(.GlobalEnv)
+  
 
-  list(
-    list(c_lb_sd_case_wt_10, c_lb_sd_control_wt_10),
-    list(r_lb_sd_case_wt_10, r_lb_sd_control_wt_10),
-    list(chem_todrop_case, chem_todrop_ctrl)
-  ) %>% 
-    pmap(function(df1, df2, df3){
+  
+  # further process with count data
+  
+list(lb_sd_metal_wt_10_processed, lb_sd_op_wt_10_processed) %>% 
+    map(function(df){
       list(
-        list(df1, df2),
-        list(id_remove_c, id_remove_r)
+        df[[4]],
+        list(df[[4]][[2]], 
+             df[[4]][[2]])
       ) %>% 
-        purrr::pmap(function(data1, data2){
-          data1 %>% 
-            dplyr::select(-any_of(df3)) %>%
-            filter(pegid %notin% data2 & !is.na(pegid)) %>%
-            mutate_at(vars(starts_with("chem")), 
-                      ~extreme_remove_percentile_win(.x)) %>%
-            mutate_at(vars(starts_with("chem")),
-                      ~replace(., is.na(.)|!is.finite(.), 0) 
-                      %>% as.vector()) %>% 
-            mutate(metal_count = rowSums(
-              dplyr::select(., starts_with("chem")) > 0),
-              copper_count = rowSums(
-                dplyr::select(., matches(chem_copper)) > 0),
-              ) %>% 
-            dplyr::select(-starts_with("chem")) %>% 
-            relocate(pegid, metal_count, copper_count)
+        map(function(dflist){
+          dflist %>% 
+            pmap(function(df1, df2){
+              df1 %>% 
+                mutate(
+                  count = rowSums(
+                    across(starts_with("chem"), 
+                           ~. > median(df2[[cur_column()]]))),
+                  copper_count = rowSums(
+                    across(matches(chem_copper), 
+                           ~. > median(df2[[cur_column()]])))
+                ) %>% 
+                select(-starts_with("chem")) %>% 
+                relocate(pegid, count, copper_count)
+            })
         }) 
     }) %>% 
-    set_names("lb_sd_case_wt_10_count", 
-              "lb_sd_control_wt_10_count") %>% 
-    list2env(.GlobalEnv)
-
-  
-  lb_sd_case_wt_10_count %>% 
-    set_names("c_lb_sd_case_wt_10_count", 
-              "r_lb_sd_case_wt_10_count") %>% 
+    set_names("lb_sd_metal_wt_10_count", 
+              "lb_sd_op_wt_10_count") %>% 
     list2env(.GlobalEnv)
   
-  lb_sd_control_wt_10_count %>% 
-    set_names("c_lb_sd_control_wt_10_count", 
-              "r_lb_sd_control_wt_10_count") %>% 
-    list2env(.GlobalEnv)
-
- 
 }
 
+
 list(
-  list(c_lb_sd_case_wt_10_count, r_lb_sd_case_wt_10_count,
-       c_lb_sd_control_wt_10_count, r_lb_sd_control_wt_10_count),
+  c(lb_sd_metal_wt_10_count[[1]], lb_sd_metal_wt_10_count[[2]]),
   list(id_remove_c, id_remove_r, id_remove_c, id_remove_r)
 ) %>% 
   pmap(function(data1, data2){

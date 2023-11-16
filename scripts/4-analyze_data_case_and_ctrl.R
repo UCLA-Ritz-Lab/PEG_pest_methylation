@@ -25,10 +25,8 @@ myvar <- quote_all(pegid,sampleid,age, pd_new,female,
                    pdstudystudy,meanmethbysample)
 
 
-list(c_lb_sd_case_wt_10_count,
-     r_lb_sd_case_wt_10_count,
-     c_lb_sd_control_wt_10_count,
-     r_lb_sd_control_wt_10_count) %>% 
+c(lb_sd_metal_wt_10_count[[1]], 
+  lb_sd_metal_wt_10_count[[2]]) %>% 
   map(function(data){
     data %>% 
       dplyr::select(all_of(myvar))
@@ -63,81 +61,28 @@ list(c_lb_sd_case_wt_10_count,
   table1()
 
 
+
 #heavy metal chemical use in total
-
-list(exp_window_address_case_c, exp_window_address_case_r) %>% 
-  map(function(data){
-    data %>% 
-      filter(chemcode %in% metal_name$chemcode) %>%
-      mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
-      group_by(pegid,year) %>% 
-      summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
-      inner_join(pest_case_methylation, by = "pegid") %>%
-      replace_na(list(sum_total_lbs = 0))
-  }) %>% 
-  set_names("outcheck_c","outcheck_r") %>% 
-  list2env(.,envir = .GlobalEnv)
-
-list(list(outcheck_c,outcheck_r),
-     c("Occupational","Residential"))%>% 
-  pmap(function(data1,data2){
-    data1 %>% 
-      drop_na() %>% 
-      mutate(location = data2)
-  }) %>% 
-  rbindlist() %>% 
-  filter(year <= 2008) %>% 
-  group_by(year, location) %>% 
-  summarise(y=mean(sum_total_lbs, na.rm=T),.groups="keep") %>% 
-  #change to average per person, including unexposed people
-  ggplot(aes(x=year, y=y, group=location, color = factor(location))) + 
-  annotate("rect", fill = "azure2", alpha = 0.5,
-           xmin = 1989, xmax = 2010,
-           ymin = -Inf, ymax = Inf) +
-  labs(x = "Years",
-       y = "Chemical use (lbs)",
-       color = "Location") +
-  #geom_point()+
-  geom_line(linewidth=1) +
-  scale_color_colorblind() +
-  # scale_color_ordinal(labels=c("Without PD", "With PD")) +
-  geom_vline(xintercept = 1989, lty=2) +
-  theme_classic()+
-  theme( plot.title = element_text(hjust = 0.5, size=20,face="bold"),
-         axis.text = element_text(size = 15),
-         axis.title=element_text(size=20,face="bold"),
-         legend.title = element_text(size = 14),
-         legend.text = element_text(size = 14),
-         strip.text = element_text(size=13)) 
-
-#heavy metal chemical use: specific
-
-
-list(exp_window_address_case_c, exp_window_address_case_r) %>% 
-  map(function(data){
-    data %>% 
-      filter(chemcode %in% metal_name$chemcode) %>%
-      # mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
-      group_by(chemcode) %>% 
-      group_split() %>% 
-      map(function(df){
-        df %>% 
+list(metal_filter, op_filter) %>% 
+  map(function(chem){
+    exp_window_address_all_list %>% 
+      map(function(data){
+        data %>% 
+          filter(chemcode %in% chem) %>%
           mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
           group_by(pegid,year) %>% 
           summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
-          inner_join(pest_case_methylation, by = "pegid") %>%
+          inner_join(pest_methylation_clean[[1]], by = "pegid") %>%
           replace_na(list(sum_total_lbs = 0))
-      })
+      }) 
   }) %>% 
-  set_names("outcheck_list_c","outcheck_list_r") %>% 
+  set_names("outcheck_metal_all","outcheck_op_all") %>% 
   list2env(.,envir = .GlobalEnv)
 
-plotlist <- list(outcheck_list_c, outcheck_list_r) %>% 
-  pmap(function(list1, list2){
-    list(
-      list(list1, list2),
-      c("Occupational","Residential")
-    ) %>% 
+list(outcheck_metal_all, outcheck_op_all) %>% 
+  map(function(data){
+    list(data,
+         c("Occupational","Residential"))%>% 
       pmap(function(data1,data2){
         data1 %>% 
           drop_na() %>% 
@@ -171,13 +116,77 @@ plotlist <- list(outcheck_list_c, outcheck_list_r) %>%
 
 
 
+#heavy metal & op chemical use: specific
 
-png(file=here("figures","heavy metal exposure trend_fitered.png"), 
-    width = 1920, height = 1920)
-ggarrange(plotlist = plotlist,
-          labels = metal_name$chemname,
-          ncol = 3, nrow = 6)
-dev.off()
+list(metal_filter, op_filter) %>% 
+  map(function(chem){
+    exp_window_address_all_list %>% 
+      map(function(data){
+        data %>% 
+          filter(chemcode %in% chem) %>%
+          # mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
+          group_by(chemcode) %>% 
+          group_split() %>% 
+          map(function(df){
+            df %>% 
+              mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
+              group_by(pegid,year) %>% 
+              summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
+              inner_join(pest_methylation_clean[[1]], by = "pegid") %>%
+              replace_na(list(sum_total_lbs = 0))
+          })
+      }) 
+  }) %>% 
+  set_names("outcheck_metal_specific","outcheck_op_specific") %>% 
+  list2env(.,envir = .GlobalEnv)
+
+list(outcheck_metal_specific, outcheck_op_specific) %>% 
+  map(function(data){
+    data %>% 
+      pmap(function(list1, list2){
+        list(
+          list(list1, list2),
+          c("Occupational","Residential")
+        ) %>% 
+          pmap(function(data1,data2){
+            data1 %>% 
+              drop_na() %>% 
+              mutate(location = data2)
+          }) %>% 
+          rbindlist() %>% 
+          filter(year <= 2008) %>% 
+          group_by(year, location) %>% 
+          summarise(y=mean(sum_total_lbs, na.rm=T),.groups="keep") %>% 
+          #change to average per person, including unexposed people
+          ggplot(aes(x=year, y=y, group=location, color = factor(location))) + 
+          annotate("rect", fill = "azure2", alpha = 0.5,
+                   xmin = 1989, xmax = 2010,
+                   ymin = -Inf, ymax = Inf) +
+          labs(x = "Years",
+               y = "Chemical use (lbs)",
+               color = "Location") +
+          #geom_point()+
+          geom_line(linewidth=1) +
+          scale_color_colorblind() +
+          # scale_color_ordinal(labels=c("Without PD", "With PD")) +
+          geom_vline(xintercept = 1989, lty=2) +
+          theme_classic()
+      })
+  }) %>% 
+  set_names("plotlist_metal", "plotlist_op") %>% 
+  list2env(.GlobalEnv)
+
+list(
+  list(plotlist_metal, plotlist_op),
+  list(metal_filter, op_filter)
+) %>% 
+  pmap(function(df1, chem){
+    ggarrange(plotlist = df1,
+              labels = chem,
+              common.legend = T,
+              legend = "bottom")
+  })
+
 
 
 

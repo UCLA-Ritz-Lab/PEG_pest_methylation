@@ -177,13 +177,8 @@ create_ztrans <- function(data){
 
 create_counts <- function(data){
   data %>% 
-    mutate(metal_count = rowSums(
-      select(., starts_with("chem")) > 0),
-      copper_count = rowSums(
-        select(., matches(chem_copper)) > 0),
-    ) %>% 
-    select(-starts_with("chem")) %>% 
-    relocate(pegid, metal_count, copper_count)
+    as_tibble()
 }
+
 
 #--------------------------------End of the code--------------------------------
