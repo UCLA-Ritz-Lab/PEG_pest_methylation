@@ -62,23 +62,23 @@
   #   #   map(.,load,.GlobalEnv)
   #   
   #   
-  #   #for load result use
-  #   list.dirs(here(),recursive = FALSE) %>%
-  #     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-  #     grep("dmp|dmr",., 
-  #          value=TRUE, ignore.case = TRUE) %>%
-  #     # keep(~!str_detect(.x,"win|dmplist|old")) %>%
-  #     map(.,load,.GlobalEnv)
-  #   }
+    #for load result use
+    # list.dirs(here::here(),recursive = FALSE) %>%
+    #   list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+    #   grep("meffil_count|count_noop",.,
+    #        value=TRUE, ignore.case = TRUE) %>%
+    #   # keep(~!str_detect(.x,"win|dmplist|old")) %>%
+    #   map(.,load,.GlobalEnv)
+    # }
 
   
   # load residuals
-  # list.dirs(here(),recursive = FALSE) %>%
-  #   list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-  #   grep("filter_",., 
-  #        value=TRUE, ignore.case = TRUE) %>%
-  #   keep(~!str_detect(.x,"win|dmplist|old|more|90|0.1")) %>%
-  #   map(.,load,.GlobalEnv)
+  list.dirs(here(),recursive = FALSE) %>%
+    list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+    grep("filter_",.,
+         value=TRUE, ignore.case = TRUE) %>%
+    keep(~!str_detect(.x,"win|dmplist|old|more|90|0.1|archive")) %>%
+    map(.,load,.GlobalEnv)
   
   # load filtered beta-matrix
   list.dirs(here::here(),recursive = FALSE) %>%

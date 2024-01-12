@@ -23,13 +23,13 @@
 #1. Get the clean peg_cov & peg_keyvar data
 
 {
-  list("(?i)metal|copper", "(?i)Organophosphorus") %>% 
+  list("(?i)metal|copper", "(?i)copper", "(?i)Organophosphorus") %>% 
     map(function(data){
       chem_class %>% 
         filter(str_detect(`chem class (pan)`, data)) %>% 
         filter(chemcode %notin% c("chem1751", "chem153"))
     }) %>% 
-    set_names("heavy_metal", "chem_op") %>% 
+    set_names("heavy_metal", "chem_copper", "chem_op") %>% 
     list2env(.GlobalEnv)
   
   
@@ -356,7 +356,7 @@ pest_methylation_clean <- list(
                       cd8t,cd4t,nk,bcell,mono,gran,pdstudystudy,
                       pdstudydiseasestatus)
   
-  list(heavy_metal$chemcode, chem_op$chemcode) %>% 
+  list(heavy_metal$chemcode, chem_copper$chemcode, chem_op$chemcode) %>% 
     map(function(chemlist){
       list(
         list(exp_lb_case_wt[[1]], exp_lb_control_wt[[1]]),
@@ -412,12 +412,12 @@ pest_methylation_clean <- list(
             }) 
         }) 
     }) %>% 
-    set_names("lb_sd_metal_wt_10", "lb_sd_op_wt_10") %>% 
+    set_names("lb_sd_metal_wt_10", "lb_sd_copper_wt_10", "lb_sd_op_wt_10") %>% 
     list2env(.GlobalEnv)
   
   
   #calculate the n and % of exposure for each chemical: combine
-  list(lb_sd_metal_wt_10, lb_sd_op_wt_10) %>% 
+  list(lb_sd_metal_wt_10, lb_sd_copper_wt_10, lb_sd_op_wt_10) %>% 
     map(function(df){
       list(
         df,
@@ -448,11 +448,13 @@ pest_methylation_clean <- list(
         }) 
     }) %>% 
     set_names("dur_long_combine_metal_list", 
+              "dur_long_combine_copper_list",
               "dur_long_combine_op_list") %>% 
     list2env(.GlobalEnv)
 
   
-  list(dur_long_combine_metal_list, dur_long_combine_op_list) %>% 
+  list(dur_long_combine_metal_list, dur_long_combine_copper_list, 
+       dur_long_combine_op_list) %>% 
     map(function(df){
       df %>% 
         map(function(data){
@@ -467,12 +469,13 @@ pest_methylation_clean <- list(
         left_join(chem_class, by = c("chemname","chemcode")) %>% 
         relocate(chemname,chemcode,`chem class (pan)`)
     }) %>% 
-    set_names("dur_long_combine_metal", 
+    set_names("dur_long_combine_metal",
+              "dur_long_combine_copper",
               "dur_long_combine_op") %>% 
     list2env(.GlobalEnv)
   
   
-  list(dur_long_combine_metal, dur_long_combine_op) %>% 
+  list(dur_long_combine_metal, dur_long_combine_copper, dur_long_combine_op) %>% 
     map(function(df){
       df %>% 
         filter(n_exp >= 30) %>%
@@ -480,20 +483,27 @@ pest_methylation_clean <- list(
                                   "chem353", "chem354")) %>%
         pull(chemcode) 
     }) %>% 
-    set_names("metal_filter", "op_filter") %>% 
+    set_names("metal_filter", "copper_filter", "op_filter") %>% 
     list2env(.GlobalEnv)
   
+  
+  list(
+    list(metal_filter, copper_filter, op_filter),
+    list(heavy_metal, chem_copper, chem_op)
+  ) %>% 
+    pmap(function(data1, data2){
+      data2 %>% 
+        filter(chemcode %in% data1) %>% 
+        filter(chemcode %notin% c("chem1638", "chem164", "chem283",
+                                  "chem353", "chem354")) %>% 
+        arrange(chemcode)
+    }) %>%
+    set_names("metal_filter_name", "copper_filter_name", "op_filter_name") %>%
+    list2env(.GlobalEnv)
 
   
-  # metal_name <- str_sort(metal_filter) %>% 
-  #   map(function(chem){
-  #     heavy_metal %>% 
-  #       filter(chemcode %in% chem) %>% 
-  #       filter(chemcode %notin% c("chem1638", "chem164", "chem283", 
-  #                                 "chem353", "chem354"))
-  #   }) %>% 
-  #   rbindlist()
   metal_todrop <- setdiff(heavy_metal$chemcode, metal_filter)
+  copper_todrop <- setdiff(chemcopper$chemcode, copper_filter)
   op_todrop <- setdiff(chem_op$chemcode, op_filter)
   
   # setdiff(names(r_lb_sd_case_wt_10), names(c_lb_sd_case_wt_10))
@@ -504,14 +514,11 @@ pest_methylation_clean <- list(
                    "11887JA27", "12158FS27", "12313LH31", "85491MA39") 
   id_remove_r <- c("11887JA27")
   
-  chem_copper <- heavy_metal %>% 
-    filter(str_detect(chemname, "(?i)copper")) %>% 
-    pull(chemcode)
   
   
   list(
-    list(lb_sd_metal_wt_10, lb_sd_op_wt_10),
-    list(metal_todrop, op_todrop)
+    list(lb_sd_metal_wt_10, lb_sd_copper_wt_10, lb_sd_op_wt_10),
+    list(metal_todrop, copper_todrop, op_todrop)
   ) %>% 
     pmap(function(df, chem){
       list(create_quantile, create_evernever, 
@@ -548,6 +555,7 @@ pest_methylation_clean <- list(
         }) 
     }) %>% 
     set_names("lb_sd_metal_wt_10_processed", 
+              "lb_sd_copper_wt_10_processed",
               "lb_sd_op_wt_10_processed") %>% 
     list2env(.GlobalEnv)
   
@@ -562,7 +570,8 @@ pest_methylation_clean <- list(
   
   # further process with count data
   
-list(lb_sd_metal_wt_10_processed, lb_sd_op_wt_10_processed) %>% 
+list(lb_sd_metal_wt_10_processed, lb_sd_copper_wt_10_processed, 
+     lb_sd_op_wt_10_processed) %>% 
     map(function(df){
       list(
         df[[4]],
@@ -576,10 +585,11 @@ list(lb_sd_metal_wt_10_processed, lb_sd_op_wt_10_processed) %>%
                 mutate(
                   count = rowSums(
                     across(starts_with("chem"), 
-                           ~. > median(df2[[cur_column()]]))),
-                  copper_count = rowSums(
-                    across(matches(chem_copper), 
                            ~. > median(df2[[cur_column()]])))
+                  # ,
+                  # copper_count = rowSums(
+                  #   across(matches(chem_copper), 
+                  #          ~. > median(df2[[cur_column()]])))
                 ) %>% 
                 select(-starts_with("chem")) %>% 
                 relocate(pegid, count, copper_count)
@@ -587,10 +597,12 @@ list(lb_sd_metal_wt_10_processed, lb_sd_op_wt_10_processed) %>%
         }) 
     }) %>% 
     set_names("lb_sd_metal_wt_10_count", 
+              "lb_sd_copper_wt_10_count",
               "lb_sd_op_wt_10_count") %>% 
     list2env(.GlobalEnv)
   
 }
+
 
 
 list(
@@ -610,11 +622,8 @@ peg_noob_nors_win_total <- list(PEG_NOOB_nors_win_filter_ctrl_r,
                                 PEG_NOOB_nors_win_filter_pd_r) %>% 
   bind_cols()
 
+combined_resid_total <- list(combined_resid_filter_ctrl_r, 
+                             combined_resid_filter_pd_r) %>% 
+  bind_cols()
 
-
-# names(peg_noob_nors_win_total)
-
-# names(combined_resid_filter_pd_c) <- sampleid_pd_c
-# names(combined_resid_filter_pd_r) <- sampleid_pd_r
-# names(combined_resid_filter_ctrl_c) <- sampleid_ctrl_c
-# names(combined_resid_filter_ctrl_r) <- sampleid_ctrl_r
+#--------------------------------End of the code--------------------------------

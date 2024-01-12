@@ -72,7 +72,7 @@ pacman::p_load(
 #invisible(lapply(paste0('package:', names(sessionInfo()$otherPkgs)), detach, character.only=TRUE, unload=TRUE))
 # if (!requireNamespace("BiocManager", quietly=TRUE))
 #   install.packages("BiocManager")
-# BiocManager::install("methylGSA")
+# BiocManager::install("HPO.db")
 # install.packages("devtools")
 # library(devtools)
 # install_github("perishky/meffil",force = TRUE)
