@@ -63,12 +63,12 @@
   #   
   #   
     #for load result use
-    # list.dirs(here::here(),recursive = FALSE) %>%
-    #   list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-    #   grep("meffil_count|count_noop",.,
-    #        value=TRUE, ignore.case = TRUE) %>%
-    #   # keep(~!str_detect(.x,"win|dmplist|old")) %>%
-    #   map(.,load,.GlobalEnv)
+    list.dirs(here::here(),recursive = FALSE) %>%
+      list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+      grep("meffil_count",.,
+           value=TRUE, ignore.case = TRUE) %>%
+      # keep(~!str_detect(.x,"win|dmplist|old")) %>%
+      map(.,load,.GlobalEnv)
     # }
 
   

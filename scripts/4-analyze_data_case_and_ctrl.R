@@ -604,8 +604,17 @@ list(
 #             "annote_table_copper_noop_total") %>% 
 #   list2env(.GlobalEnv)
 
-write_csv(annote_table_copper_noop_case, 
-          here("tables", "annote_table_copper_noop_case.csv"), na = "")
+table_names <- list(annote_table_op_case = annote_table_op_case,
+                    annote_table_noop_case = annote_table_noop_case)
+
+list(table_names,
+     names(table_names)) %>% 
+  pmap(function(data1,data2){
+    write_csv(data1, 
+              here("tables", paste(data2, ".csv", sep = "")))
+  })
+
+
 
 list(list(metal_meffil_op_case, ann450ksubt_op_case),
      list(metal_meffil_op_ctrl, ann450ksubt_op_ctrl),
@@ -619,27 +628,27 @@ list(list(metal_meffil_op_case, ann450ksubt_op_case),
         cbind(data1,data2)
       })
   }) %>% 
-  set_names("ewas_annot_case", "ewas_annot_ctrl", "ewas_annot_total",
+  set_names("ewas_annot_op_case", "ewas_annot_op_ctrl", "ewas_annot_op_total",
             "ewas_annot_noop_case", "ewas_annot_noop_ctrl", 
             "ewas_annot_noop_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
 
-list(ewas_annot_case, ewas_annot_ctrl, ewas_annot_total,
+list(ewas_annot_op_case, ewas_annot_op_ctrl, ewas_annot_op_total,
      ewas_annot_noop_case, ewas_annot_noop_ctrl, ewas_annot_noop_total) %>% 
   map(function(plist){
     plist %>% 
       map(~filter(.x, -log10(p.value) > 6))
   }) %>% 
-  set_names("ewas_annot_new_case","ewas_annot_new_ctrl", 
-            "ewas_annot_new_total", "ewas_annot_new_noop_case",
+  set_names("ewas_annot_new_op_case","ewas_annot_new_op_ctrl", 
+            "ewas_annot_new_op_total", "ewas_annot_new_noop_case",
             "ewas_annot_new_noop_ctrl", "ewas_annot_new_noop_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 library(methylGSA)
 
-list(ewas_annot_new_case, ewas_annot_new_noop_case) %>% 
+list(ewas_annot_op_case, ewas_annot_noop_case) %>% 
   map(function(datalist){
     datalist %>% 
       map(function(data){
@@ -648,33 +657,19 @@ list(ewas_annot_new_case, ewas_annot_new_noop_case) %>%
           set_names(data$cpgs)
       })
   }) %>% 
-  set_names("meta.cpg_case", "meta.cpg_noop_case") %>% 
+  set_names("meta.cpg_op_case", "meta.cpg_noop_case") %>% 
   list2env(.GlobalEnv)
 
-
-# meta.cpg_total <- ewas_annot_new_total %>% 
-#   map(function(data){
-#     data %>% 
-#       pull(p.value) %>% 
-#       set_names(data$cpgs)
-#   })
-
-meta.cpg_case %>% 
-  set_names("meta.cpg_case_total", "meta.cpg_case_copper") %>% 
-  list2env(.,envir = .GlobalEnv)
-
-meta.cpg_noop_case %>% 
-  set_names("meta.cpg_noop_case_total", "meta.cpg_noop_case_copper") %>% 
-  list2env(.,envir = .GlobalEnv)
-# meta.cpg_total %>% 
-#   set_names("meta.cpg_total_total", "meta.cpg_total_copper") %>% 
-#   list2env(.,envir = .GlobalEnv)
-
-
+?methylRRA()
 #function 2: methylRRA
 # gsea_case_total <- methylRRA(cpg.pval = meta.cpg_case_total, method = "GSEA")
-gsea_case_copper <- methylRRA(cpg.pval = meta.cpg_case_copper, method = "ORA")
-gsea_case_noop_copper <- methylRRA(cpg.pval = meta.cpg_noop_case_copper, method = "ORA")
+gsea_case_copper <- methylRRA(cpg.pval = meta.cpg_op_case[[1]], 
+                              array.type = "450K", group = "all", sig.cut = 0.05, 
+                              method = "GSEA", GS.idtype = "SYMBOL", 
+                              GS.type = "GO", minsize = 100, maxsize = 500)
+
+
+gsea_case_noop_copper <- methylRRA(cpg.pval = meta.cpg_noop_case[[1]], method = "ORA")
 
 ?methylRRA()
 
@@ -697,10 +692,10 @@ lengths(panther)
 
 #ALL CpG sites
 #GSEA for panther pathways
-methylglm_pan_case_total <- methylglm(cpg.pval = meta.cpg_case_total, 
+methylglm_pan_case_op <- methylglm(cpg.pval = meta.cpg_op_case[[1]], 
                                 GS.list = panther, GS.idtype = "ENTREZID")
 
-methylglm_pan_case_copper <- methylglm(cpg.pval = meta.cpg_case_copper, 
+methylglm_pan_case_noop <- methylglm(cpg.pval = meta.cpg_noop_case[[1]], 
                                 GS.list = panther, GS.idtype = "ENTREZID")
 ?methylglm()
 #get pathway names

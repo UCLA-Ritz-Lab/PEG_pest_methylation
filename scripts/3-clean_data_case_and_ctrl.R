@@ -503,7 +503,7 @@ pest_methylation_clean <- list(
 
   
   metal_todrop <- setdiff(heavy_metal$chemcode, metal_filter)
-  copper_todrop <- setdiff(chemcopper$chemcode, copper_filter)
+  copper_todrop <- setdiff(chem_copper$chemcode, copper_filter)
   op_todrop <- setdiff(chem_op$chemcode, op_filter)
   
   # setdiff(names(r_lb_sd_case_wt_10), names(c_lb_sd_case_wt_10))
@@ -592,7 +592,7 @@ list(lb_sd_metal_wt_10_processed, lb_sd_copper_wt_10_processed,
                   #          ~. > median(df2[[cur_column()]])))
                 ) %>% 
                 select(-starts_with("chem")) %>% 
-                relocate(pegid, count, copper_count)
+                relocate(pegid, count)
             })
         }) 
     }) %>% 
