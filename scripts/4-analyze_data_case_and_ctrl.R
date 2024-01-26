@@ -636,19 +636,24 @@ list(list(metal_meffil_op_case, ann450ksubt_op_case),
 
 
 list(ewas_annot_op_case, ewas_annot_op_ctrl, ewas_annot_op_total,
-     ewas_annot_noop_case, ewas_annot_noop_ctrl, ewas_annot_noop_total) %>% 
+     ewas_annot_noop_case, ewas_annot_noop_ctrl, ewas_annot_noop_total) %>%
   map(function(plist){
-    plist %>% 
-      map(~filter(.x, -log10(p.value) > 6))
-  }) %>% 
-  set_names("ewas_annot_new_op_case","ewas_annot_new_op_ctrl", 
-            "ewas_annot_new_op_total", "ewas_annot_new_noop_case",
-            "ewas_annot_new_noop_ctrl", "ewas_annot_new_noop_total") %>% 
+    plist %>%
+      map(~filter(.x, p.value < 1E-06 
+                  # & !str_detect(UCSC_RefGene_Name, ";")
+                  ))
+  }) %>%
+  set_names("ewas_annot_filter_op_case","ewas_annot_filter_op_ctrl",
+            "ewas_annot_filter_op_total", "ewas_annot_filter_noop_case",
+            "ewas_annot_filter_noop_ctrl", "ewas_annot_filter_noop_total") %>%
   list2env(.,envir = .GlobalEnv)
 
 library(methylGSA)
 
-list(ewas_annot_op_case, ewas_annot_noop_case) %>% 
+list(ewas_annot_filter_op_case, ewas_annot_filter_op_ctrl, 
+     ewas_annot_filter_op_total, 
+     ewas_annot_filter_noop_case, ewas_annot_filter_noop_ctrl, 
+     ewas_annot_filter_noop_total) %>% 
   map(function(datalist){
     datalist %>% 
       map(function(data){
@@ -657,21 +662,58 @@ list(ewas_annot_op_case, ewas_annot_noop_case) %>%
           set_names(data$cpgs)
       })
   }) %>% 
-  set_names("meta.cpg_op_case", "meta.cpg_noop_case") %>% 
+  set_names("meta.cpg_op_case", "meta.cpg_op_ctrl", "meta.cpg_op_total", 
+            "meta.cpg_noop_case", "meta.cpg_noop_ctrl", 
+            "meta.cpg_noop_total") %>% 
   list2env(.GlobalEnv)
 
-?methylRRA()
+
 #function 2: methylRRA
-# gsea_case_total <- methylRRA(cpg.pval = meta.cpg_case_total, method = "GSEA")
-gsea_case_copper <- methylRRA(cpg.pval = meta.cpg_op_case[[1]], 
-                              array.type = "450K", group = "all", sig.cut = 0.05, 
-                              method = "GSEA", GS.idtype = "SYMBOL", 
-                              GS.type = "GO", minsize = 100, maxsize = 500)
 
 
-gsea_case_noop_copper <- methylRRA(cpg.pval = meta.cpg_noop_case[[1]], method = "ORA")
+list(meta.cpg_op_case, meta.cpg_op_ctrl, meta.cpg_op_total,
+     meta.cpg_noop_case, meta.cpg_noop_ctrl, meta.cpg_noop_total) %>% 
+  map(function(cpglist){
+    list("GO", "KEGG", "Reactome") %>% 
+      map(function(data){
+        methylRRA(cpg.pval = cpglist[[1]], 
+                  sig.cut = 0.05, 
+                  method = "ORA", GS.type = data)
+      }) 
+  }) %>%
+  set_names("gsea_case_op_copper_list", "gsea_ctrl_op_copper_list", 
+            "gsea_total_op_copper_list", 
+            "gsea_case_noop_copper_list", "gsea_ctrl_noop_copper_list", 
+            "gsea_total_noop_copper_list") %>%
+  list2env(.GlobalEnv)
 
-?methylRRA()
+test <- getAnnot("450K", "all")
+cpg.intersect <- intersect(names(meta.cpg_op_case[[1]]), rownames(test))
+cpg.pval_test <- meta.cpg_op_case[[1]][cpg.intersect]
+test.sub = test[names(cpg.pval_test), ]
+geneID.list = split(cpg.pval_test, names(cpg.pval_test))
+rho <- vapply(geneID.list, RobustRankAggreg::rhoScores, FUN.VALUE = 1)
+library(org.Hs.eg.db)
+
+GS.sizes = vapply(panther, length, FUN.VALUE = 0)
+GS.list.sub = panther[GS.sizes >= 100 & GS.sizes <= 
+                        500]
+size = vapply(GS.list.sub, length, FUN.VALUE = 0)
+
+
+rhoadj <- p.adjust(rho, method = "BH")
+DEgenes <- names(rhoadj)[rhoadj < 0.05]
+
+N <- length(unique(test.sub$UCSC_RefGene_Name))
+m <- length(DEgenes)
+
+overlap.genes <- lapply(panther, function(x) DEgenes[DEgenes %in% 
+                                                          x])
+Q = vapply(overlap.genes, length, 0)
+
+Count = Q
+gs.pval = phyper(q = Q, m = 74, n = 1, k = 1, 
+                 lower.tail = FALSE)
 
 barplot(gsea_case_total, num = 10, colorby = "pvalue")
 barplot(gsea_case_copper, num = 10, colorby = "pvalue")
@@ -682,14 +724,16 @@ barplot(gsea_total_copper, num = 10, colorby = "pvalue")
 library(PANTHER.db)
 pthOrganisms(PANTHER.db) <- "HUMAN"
 PANTHER.db
-
+columns(PANTHER.db)
+keytypes(PANTHER.db)
 
 go_ids <- keys(PANTHER.db,keytype="PATHWAY_ID")
 cols <- "ENTREZ"
 panther <- mapIds(PANTHER.db, keys=go_ids, column=cols, 
                   as.numeric(cols), keytype="PATHWAY_ID", multiVals="list")
 lengths(panther)
-
+panther_inner <- select(PANTHER.db, keys=go_ids, column=cols, 
+                        keytype="PATHWAY_ID", jointype = "left")
 #ALL CpG sites
 #GSEA for panther pathways
 methylglm_pan_case_op <- methylglm(cpg.pval = meta.cpg_op_case[[1]], 
@@ -711,10 +755,10 @@ panther.names <- res.p %>%
     pathway = value
   )
 
-methylglm_path_case_total <- methylglm_pan_case_total %>% 
+methylglm_path_case_op <- methylglm_pan_case_op %>% 
   left_join(panther.names, by = "ID")
 
-methylglm_path_case_copper <- methylglm_pan_case_copper %>% 
+methylglm_path_case_noop <- methylglm_pan_case_noop %>% 
   left_join(panther.names, by = "ID")
 
 # Visulization ------------------------------------------------------------
