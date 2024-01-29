@@ -38,6 +38,7 @@ pacman::p_load(
   "gridExtra",   #combining plots and tables on plots: grid.arrange(), tableGrob()
   "ggpubr",      #combines plots: ggarrange()
   "ggthemes",     #blind colors
+  "ggVennDiagram", #venn diagram
   #"Amelia",      #check missing pattern: missmap()
   #"pheatmap",    #create pretty heatmap: pheatmap()
   #"qqman",       #create Manhattan plots: manhattan()

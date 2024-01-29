@@ -78,7 +78,7 @@ c(lb_sd_metal_wt_10_count[[1]],
   rbindlist() %>% 
   left_join(count_combine_copper_total, by = "pegid") %>% 
   left_join(count_combine_op_total %>% 
-              select(pegid, total), by = "pegid") %>%
+              dplyr::select(pegid, total), by = "pegid") %>%
   set_variable_labels(
     pegid = "PEGID",
     age = "Age",
@@ -581,6 +581,23 @@ list(
   list2env(.GlobalEnv)
 
 
+list(annote_table_op_case$cpg, annote_table_noop_case$cpg) %>% 
+  ggVennDiagram(
+    category.names = c("A", "B"),
+    set_color = c("blue", "red"),
+    set_size = 6,
+    label = "both",
+    label_geom = "label",
+    label_alpha = 0,
+    label_color = "firebrick"
+  ) +
+  scale_fill_gradient(low = "grey90",high = "grey60") +
+  scale_color_manual(values = c("grey10","grey10"))
+
+test2 <- annote_table_op_case %>% 
+  select(cpg, gene, gene_region) %>% 
+  filter(cpg %notin% annote_table_noop_case$cpg)
+
 # list(meffil_count_op_case, meffil_count_op_ctrl, meffil_count_op_total,
 #      meffil_count_noop_case, meffil_count_noop_ctrl, meffil_count_noop_total) %>% 
 #   map(function(data){
@@ -639,9 +656,11 @@ list(ewas_annot_op_case, ewas_annot_op_ctrl, ewas_annot_op_total,
      ewas_annot_noop_case, ewas_annot_noop_ctrl, ewas_annot_noop_total) %>%
   map(function(plist){
     plist %>%
-      map(~filter(.x, p.value < 1E-06 
-                  # & !str_detect(UCSC_RefGene_Name, ";")
-                  ))
+      # map(~filter(.x, p.value < 1E-06 
+      #             # & !str_detect(UCSC_RefGene_Name, ";")
+      #             )) %>% 
+      map(~arrange(.x, p.value) %>%
+            slice_head(n = 500))
   }) %>%
   set_names("ewas_annot_filter_op_case","ewas_annot_filter_op_ctrl",
             "ewas_annot_filter_op_total", "ewas_annot_filter_noop_case",
@@ -687,33 +706,6 @@ list(meta.cpg_op_case, meta.cpg_op_ctrl, meta.cpg_op_total,
             "gsea_total_noop_copper_list") %>%
   list2env(.GlobalEnv)
 
-test <- getAnnot("450K", "all")
-cpg.intersect <- intersect(names(meta.cpg_op_case[[1]]), rownames(test))
-cpg.pval_test <- meta.cpg_op_case[[1]][cpg.intersect]
-test.sub = test[names(cpg.pval_test), ]
-geneID.list = split(cpg.pval_test, names(cpg.pval_test))
-rho <- vapply(geneID.list, RobustRankAggreg::rhoScores, FUN.VALUE = 1)
-library(org.Hs.eg.db)
-
-GS.sizes = vapply(panther, length, FUN.VALUE = 0)
-GS.list.sub = panther[GS.sizes >= 100 & GS.sizes <= 
-                        500]
-size = vapply(GS.list.sub, length, FUN.VALUE = 0)
-
-
-rhoadj <- p.adjust(rho, method = "BH")
-DEgenes <- names(rhoadj)[rhoadj < 0.05]
-
-N <- length(unique(test.sub$UCSC_RefGene_Name))
-m <- length(DEgenes)
-
-overlap.genes <- lapply(panther, function(x) DEgenes[DEgenes %in% 
-                                                          x])
-Q = vapply(overlap.genes, length, 0)
-
-Count = Q
-gs.pval = phyper(q = Q, m = 74, n = 1, k = 1, 
-                 lower.tail = FALSE)
 
 barplot(gsea_case_total, num = 10, colorby = "pvalue")
 barplot(gsea_case_copper, num = 10, colorby = "pvalue")
@@ -765,7 +757,7 @@ methylglm_path_case_noop <- methylglm_pan_case_noop %>%
 
 library(ggtext)
 
-list(meffil_count_case, meffil_count_ctrl, meffil_count_total,
+list(meffil_count_op_case, meffil_count_op_ctrl, meffil_count_op_total,
      meffil_count_noop_case, meffil_count_noop_ctrl, meffil_count_noop_total) %>% 
   map(function(meffil_list){
     meffil_list %>% 
@@ -788,11 +780,11 @@ list(meffil_count_case, meffil_count_ctrl, meffil_count_total,
         datanew
       })
   }) %>% 
-  set_names("metal_list_case","metal_list_ctrl", "metal_list_total",
+  set_names("metal_list_op_case","metal_list_op_ctrl", "metal_list_op_total",
             "metal_list_noop_case","metal_list_noop_ctrl", "metal_list_noop_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
-list(metal_list_case, metal_list_ctrl, metal_list_total,
+list(metal_list_op_case, metal_list_op_ctrl, metal_list_op_total,
      metal_list_noop_case, metal_list_noop_ctrl, metal_list_noop_total) %>% 
   map(function(metal_list){
     metal_list %>% 
@@ -803,12 +795,12 @@ list(metal_list_case, metal_list_ctrl, metal_list_total,
           ungroup()
       })
   }) %>% 
-  set_names("axis_set_case", "axis_set_ctrl", "axis_set_total",
+  set_names("axis_set_op_case", "axis_set_op_ctrl", "axis_set_op_total",
             "axis_set_noop_case", "axis_set_noop_ctrl", "axis_set_noop_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
-list(metal_list_case, metal_list_ctrl, metal_list_total,
+list(metal_list_op_case, metal_list_op_ctrl, metal_list_op_total,
      metal_list_noop_case, metal_list_noop_ctrl, metal_list_noop_total) %>% 
   map(function(metal_list){
     metal_list %>% 
@@ -819,50 +811,19 @@ list(metal_list_case, metal_list_ctrl, metal_list_total,
           pull(ylim)
       })
   }) %>% 
-  set_names("ylim_case","ylim_ctrl", "ylim_total",
+  set_names("ylim_op_case","ylim_op_ctrl", "ylim_op_total",
             "ylim_noop_case","ylim_noop_ctrl", "ylim_noop_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
-plotlist <- list(
-  list(metal_list_case, axis_set_case, ylim_case),
-  list(metal_list_ctrl, axis_set_ctrl, ylim_ctrl),
-  list(metal_list_total, axis_set_total, ylim_total)) %>% 
-  map(function(datalist){
-    datalist %>% 
-      pmap(function(pest, axis, ylim){
-        pest %>% 
-          mutate(sig = if_else(-log10(p.value) > 6, 1, 0)) %>% 
-          ggplot(aes(x = global, y = -log10(p.value), 
-                     color = as_factor(sig), size = -log10(p.value))) +
-          scale_color_manual(values = c("1" = "red", "0" = "black")) +
-          geom_hline(yintercept = -log10(10e-7), color = "red", linetype = "dashed") + 
-          geom_point(alpha = 0.75) +
-          scale_x_continuous(label = axis$chr, breaks = axis$center) +
-          scale_y_continuous(expand = c(0,0), limits = c(0, ylim)) +
-          #scale_color_manual(values = rep(c("#276FBF", "#183059"), unique(length(axis$chr)))) +
-          scale_size_continuous(range = c(0.5,3)) +
-          labs(x = "chromosome", 
-               y = "-log<sub>10</sub>(p)",
-               color = "p-value") + 
-          theme_minimal() +
-          theme( 
-            legend.position = "none",
-            panel.border = element_blank(),
-            panel.grid.major.x = element_blank(),
-            panel.grid.minor.x = element_blank(),
-            axis.title.y = element_markdown(),
-            axis.text.x = element_text(angle = 60, size = 8, vjust = 0.5)
-          )
-      })
-  }) %>% 
-  set_names("manhattanlist_case","manhattanlist_ctrl","manhattanlist_total") %>% 
-  list2env(.,envir = .GlobalEnv)
-
 list(
+  list(metal_list_op_case, axis_set_op_case, ylim_op_case),
+  list(metal_list_op_ctrl, axis_set_op_ctrl, ylim_op_ctrl),
+  list(metal_list_op_total, axis_set_op_total, ylim_op_total),
   list(metal_list_noop_case, axis_set_noop_case, ylim_noop_case),
   list(metal_list_noop_ctrl, axis_set_noop_ctrl, ylim_noop_ctrl),
-  list(metal_list_noop_total, axis_set_noop_total, ylim_noop_total)) %>% 
+  list(metal_list_noop_total, axis_set_noop_total, ylim_noop_total)
+  ) %>% 
   map(function(datalist){
     datalist %>% 
       pmap(function(pest, axis, ylim){
@@ -886,41 +847,56 @@ list(
             panel.border = element_blank(),
             panel.grid.major.x = element_blank(),
             panel.grid.minor.x = element_blank(),
-            axis.text = element_text(size = 10,face="bold"),
-            axis.title = element_text(size=20,face="bold"),
-            axis.title.y = element_markdown(),
-            axis.text.x = element_text(angle = 60, size = 10, vjust = 0.5)
+            axis.title.y = element_markdown(face = "bold", size = 15),
+            axis.title.x = element_text(face = "bold", size = 15),
+            axis.text.y = element_text(size = 15), 
+            axis.text.x = element_text(angle = 60, size = 15, vjust = 0.5)
           )
       })
   }) %>% 
-  set_names("manhattanlist_noop_case","manhattanlist_noop_ctrl",
-            "manhattanlist_noop_total") %>% 
+  set_names("manhattanlist_op_case", "manhattanlist_op_ctrl", 
+            "manhattanlist_op_total", "manhattanlist_noop_case", 
+            "manhattanlist_noop_ctrl", "manhattanlist_noop_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
-
-plotlist <- list(manhattanlist_noop_total[[2]],
-                 manhattanlist_noop_case[[2]], 
-                 manhattanlist_noop_ctrl[[2]]
+plotlist_noop <- list(manhattanlist_noop_total[[1]],
+                 manhattanlist_noop_case[[1]], 
+                 manhattanlist_noop_ctrl[[1]]
                  )
+
+plotlist_op <- list(manhattanlist_op_total[[1]],
+                      manhattanlist_op_case[[1]], 
+                      manhattanlist_op_ctrl[[1]]
+)
 
 
 #print all plots in one figure
-png(file=here::here("figures","manhattan plots for cases and controls_copper_adjop_122423.png"), 
+png(file=here::here("figures","manhattan plots for cases and controls_copper_adjop_012824.png"), 
     width = 1920, height = 1080)
-ggarrange(plotlist = plotlist,
+ggarrange(plotlist = plotlist_op,
           labels = c("A", "B", "C"),
+          font.label = list(size = 20, color = "black"),
+          ncol = 2, nrow = 2)
+dev.off()
+
+
+png(file=here::here("figures","manhattan plots for cases and controls_copper_noop_012824.png"), 
+    width = 1920, height = 1080)
+ggarrange(plotlist = plotlist_noop,
+          labels = c("A", "B", "C"),
+          font.label = list(size = 20, color = "black"),
           ncol = 2, nrow = 2)
 dev.off()
 
 
 #scatter plot
 
-mean_methylist <- list(
+mean_methylist_copper <- list(
   list(combined_resid_total, combined_resid_filter_pd_r, 
        combined_resid_filter_ctrl_r),
-  list(count_combine_metal_total, count_combine_metal[[1]], 
-       count_combine_metal[[2]])
+  list(count_combine_copper_total, count_combine_copper[[1]], 
+       count_combine_copper[[2]])
 ) %>% 
   pmap(function(df1, df2){
     df1 %>% 
@@ -933,14 +909,34 @@ mean_methylist <- list(
       left_join(datSamplePEG %>% 
                   select(sampleid, pegid), 
                 by = "sampleid") %>% 
-      left_join(df2 %>% 
-                  select(pegid, copper), by = "pegid")
+      left_join(df2, by = "pegid")
   }) 
 
-plotlist <- mean_methylist %>% 
+
+mean_methylist_op <- list(
+  list(combined_resid_total, combined_resid_filter_pd_r, 
+       combined_resid_filter_ctrl_r),
+  list(count_combine_op_total, count_combine_op[[1]], 
+       count_combine_op[[2]])
+) %>% 
+  pmap(function(df1, df2){
+    df1 %>% 
+      map(~mean(.x)) %>% 
+      bind_rows() %>% 
+      pivot_longer(
+        cols = starts_with("X"),
+        names_to = "sampleid",
+        values_to = "mean_methyl") %>% 
+      left_join(datSamplePEG %>% 
+                  select(sampleid, pegid), 
+                by = "sampleid") %>% 
+      left_join(df2, by = "pegid")
+  }) 
+
+plotlist_copper <- mean_methylist_copper %>% 
   map(function(data){
     data %>% 
-      ggplot(aes(x = copper, y = mean_methyl)) + 
+      ggplot(aes(x = total, y = mean_methyl)) + 
       geom_point() +
       geom_smooth(method = "lm") +
       # geom_jitter()+
@@ -950,7 +946,20 @@ plotlist <- mean_methylist %>%
            y = "Mean methylation residual")
   })
 
-ggarrange(plotlist = plotlist,
+plotlist_op <- mean_methylist_op %>% 
+  map(function(data){
+    data %>% 
+      ggplot(aes(x = total, y = mean_methyl)) + 
+      geom_point() +
+      geom_smooth(method = "lm") +
+      # geom_jitter()+
+      stat_cor(label.y = 0.54)+
+      theme_classic()+
+      labs(x = "OP count",
+           y = "Mean methylation residual")
+  })
+
+ggarrange(plotlist = plotlist_op,
           labels = c("A", "B", "C"),
           ncol = 2, nrow = 2)
 
