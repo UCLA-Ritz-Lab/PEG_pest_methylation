@@ -36,9 +36,9 @@ list(lb_sd_metal_wt_10_count, lb_sd_copper_wt_10_count,
         datalist %>% 
           map(function(data){
             data %>% 
-              select(pegid, count)
+              dplyr::select(pegid, count)
           }) %>% 
-          reduce(full_join, by = "pegid") %>% 
+          purrr::reduce(full_join, by = "pegid") %>% 
           mutate_all(~replace(., is.na(.), 0)) %>% 
           transmute(pegid = pegid,
                     total = count.x + count.y)
@@ -561,7 +561,7 @@ list(
 ) %>% 
   pmap(function(data1, data2){
     data1$total$analyses$all$table %>% 
-      filter(-log10(p.value) > 6) %>% 
+      filter(-log10(p.value) > 3) %>% 
       rownames_to_column("cpg") %>% 
       mutate(chr = chromosome, 
              pos = position) %>% 
@@ -660,7 +660,7 @@ list(ewas_annot_op_case, ewas_annot_op_ctrl, ewas_annot_op_total,
       #             # & !str_detect(UCSC_RefGene_Name, ";")
       #             )) %>% 
       map(~arrange(.x, p.value) %>%
-            slice_head(n = 500))
+            slice_head(n = 1000))
   }) %>%
   set_names("ewas_annot_filter_op_case","ewas_annot_filter_op_ctrl",
             "ewas_annot_filter_op_total", "ewas_annot_filter_noop_case",
@@ -706,10 +706,11 @@ list(meta.cpg_op_case, meta.cpg_op_ctrl, meta.cpg_op_total,
             "gsea_total_noop_copper_list") %>%
   list2env(.GlobalEnv)
 
+seq(1:3) %>% 
+  map(~barplot(gsea_case_op_copper_list[[.x]], num = 10, colorby = "pvalue"))
 
-barplot(gsea_case_total, num = 10, colorby = "pvalue")
-barplot(gsea_case_copper, num = 10, colorby = "pvalue")
-barplot(gsea_total_copper, num = 10, colorby = "pvalue")
+barplot(gsea_case_op_copper_list[[1]], num = 10, colorby = "pvalue")
+barplot(gsea_case_noop_copper_list[[1]], num = 10, colorby = "pvalue")
 
 # Pathway analysis --------------------------------------------------------
 
@@ -907,11 +908,32 @@ mean_methylist_copper <- list(
         names_to = "sampleid",
         values_to = "mean_methyl") %>% 
       left_join(datSamplePEG %>% 
-                  select(sampleid, pegid), 
+                  dplyr::select(sampleid, pegid), 
                 by = "sampleid") %>% 
       left_join(df2, by = "pegid")
   }) 
 
+mean_methylist_raw_copper <- list(
+  list(peg_noob_nors_win_total, PEG_NOOB_nors_win_filter_pd_r, 
+       PEG_NOOB_nors_win_filter_ctrl_r),
+  list(count_combine_copper_total, count_combine_copper[[1]], 
+       count_combine_copper[[2]])
+) %>% 
+  pmap(function(df1, df2){
+    df1 %>% 
+      map(~mean(.x)) %>% 
+      bind_rows() %>% 
+      pivot_longer(
+        cols = starts_with("X"),
+        names_to = "sampleid",
+        values_to = "mean_methyl") %>% 
+      left_join(datSamplePEG %>% 
+                  dplyr::select(sampleid, pegid), 
+                by = "sampleid") %>% 
+      left_join(df2, by = "pegid")
+  }) 
+
+test <- mean_methylist_copper[[1]]
 
 mean_methylist_op <- list(
   list(combined_resid_total, combined_resid_filter_pd_r, 
@@ -933,6 +955,26 @@ mean_methylist_op <- list(
       left_join(df2, by = "pegid")
   }) 
 
+mean_methylist_raw_op <- list(
+  list(peg_noob_nors_win_total, PEG_NOOB_nors_win_filter_pd_r, 
+       PEG_NOOB_nors_win_filter_ctrl_r),
+  list(count_combine_op_total, count_combine_op[[1]], 
+       count_combine_op[[2]])
+) %>% 
+  pmap(function(df1, df2){
+    df1 %>% 
+      map(~mean(.x)) %>% 
+      bind_rows() %>% 
+      pivot_longer(
+        cols = starts_with("X"),
+        names_to = "sampleid",
+        values_to = "mean_methyl") %>% 
+      left_join(datSamplePEG %>% 
+                  dplyr::select(sampleid, pegid), 
+                by = "sampleid") %>% 
+      left_join(df2, by = "pegid")
+  }) 
+
 plotlist_copper <- mean_methylist_copper %>% 
   map(function(data){
     data %>% 
@@ -944,6 +986,19 @@ plotlist_copper <- mean_methylist_copper %>%
       theme_classic()+
       labs(x = "Copper count",
            y = "Mean methylation residual")
+  })
+
+plotlist_raw_copper <- mean_methylist_raw_copper %>% 
+  map(function(data){
+    data %>% 
+      ggplot(aes(x = total, y = mean_methyl)) + 
+      geom_point() +
+      geom_smooth(method = "lm") +
+      # geom_jitter()+
+      stat_cor(label.y = 0.54)+
+      theme_classic()+
+      labs(x = "Copper count",
+           y = "Mean methylation level")
   })
 
 plotlist_op <- mean_methylist_op %>% 
@@ -959,7 +1014,20 @@ plotlist_op <- mean_methylist_op %>%
            y = "Mean methylation residual")
   })
 
-ggarrange(plotlist = plotlist_op,
+plotlist_raw_op <- mean_methylist_raw_op %>% 
+  map(function(data){
+    data %>% 
+      ggplot(aes(x = total, y = mean_methyl)) + 
+      geom_point() +
+      geom_smooth(method = "lm") +
+      # geom_jitter()+
+      stat_cor(label.y = 0.54)+
+      theme_classic()+
+      labs(x = "OP count",
+           y = "Mean methylation level")
+  })
+
+ggarrange(plotlist = plotlist_raw_op,
           labels = c("A", "B", "C"),
           ncol = 2, nrow = 2)
 
