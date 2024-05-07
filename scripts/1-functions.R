@@ -43,32 +43,45 @@
     "flextable",   #as_flex_table()
     "gtsummary",   #create amazing tables: tbl_summary()
     
+    #For loading data
+    "readxl",     #read in excel data: read_xlsx
+    "haven",      #read in sas data: read_sas()
+    "here",       #setting the directory in the project: here()
+    
     #For manipulating data
-    "rlang",       #for Non-standard evaluation: eval(), expr(), ensym(), caller_env(), exec(), !!
-    "magrittr",    #for the pipe operator: %>% and %<>%
-    "broom",       #for tidying up the results of a regression: tidy()
-    "lubridate",   #for manipulating dates: intervals(), durations()
-    "labelled",    #labelleling the data: set_variable_labels(), set_value_labels()
+    "rlang",      #for Non-standard evaluation: eval(), expr(), ensym(), caller_env(), exec(), !!
+    "magrittr",   #for the pipe operator: %>% and %<>%
+    "lubridate",  #for manipulating dates: intervals(), durations()
+    "labelled",   #labelleling the data: set_variable_labels(), set_value_labels()
     
     # Enhancing plots
-    #"scales",      #makes easy to format percent, dollars, comas: percent()
-    #"ggalt",       #makes easy splines: geom_xsplines()
-    #"ggeasy",      #applies labels among other things: easy_labs()
+    "scales",      #makes easy to format percent, dollars, comas: percent()
+    "ggalt",       #makes easy splines: geom_xsplines()
+    "ggeasy",      #applies labels among other things: easy_labs()
     "gridExtra",   #combining plots and tables on plots: grid.arrange(), tableGrob()
     "ggpubr",      #combines plots: ggarrange()
     "ggthemes",     #blind colors
     "ggVennDiagram", #venn diagram
-    #"Amelia",      #check missing pattern: missmap()
-    #"pheatmap",    #create pretty heatmap: pheatmap()
-    #"qqman",       #create Manhattan plots: manhattan()
+    "Amelia",      #check missing pattern: missmap()
+    "pheatmap",    #create pretty heatmap: pheatmap(),
+    "ggnewscale",  #create multiple scales: new_scale()
+    "ggrepel",     #avoid overlapping labels: geom_text_repel()
+    "DataExplorer",#create a report of the data: create_report()
+    "patchwork",   #combines plots: wrap_plots(), plot_layout()
+    "plotly",      #create interactive plots: ggplotly()
     
     # Other great packages
     "glue",        #replaces paste: glue()
     "Hmisc",       #explore the data: describe()
-    #"mise",        #clear environment space: mise()
+    "mice",        #imput missing data: mice()
     "gmodels",     #create contigency table: CrossTable()
     "meta",        #meta models: metagen()
     "codebook",    #amazing package to set labels: dict_to_list()
+    "foreach",     #executing R code repeatedly: foreach(), %do%, %dopar%
+    "doParallel",  #Provides a parallel backend for the %dopar% function: registerDoParallel(),
+    "doFuture",    #Provides a parallel backend for the %dofuture% function: registerDoFuture()
+    "future",      #Provides a future backend for the %dofuture% function: plan()
+    "furrr",       #Provides a purrr like syntax for future: future_map(), future_pmap()
     
     # For analysis
     #"lme4",        #linear mixed-effects model: lmer()
@@ -80,12 +93,7 @@
     # "ChAMP",       #champ.DMP(), champ.DMR()
     #"mixOmics",    #block.plsda()
     
-    #For loading data
-    "readxl",      #read in excel data: read_xlsx
-    "haven",       #read in sas data: read_sas()
-    "here",        #setting the directory in the project: here()
-    
-    #For data manipulation
+    #For data cleaning
     "tidyverse"   #data manipulation and visualization:select(), mutate()
   )
 }
