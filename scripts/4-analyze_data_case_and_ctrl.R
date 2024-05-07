@@ -1,8 +1,8 @@
 ## ---------------------------
 ##
-## Script name: 
+## Script name: 4-analyze_data_case_and_ctrl.R
 ##
-## Purpose of script: 
+## Purpose of script: To analyze the data for case and control groups
 ##
 ## Author: Yufan Gong
 ##

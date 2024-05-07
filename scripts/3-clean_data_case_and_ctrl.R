@@ -1,8 +1,8 @@
 ## ---------------------------
 ##
-## Script name: 3-clean_data_caseonly
+## Script name: 3-clean_data_case_and_ctrl.R
 ##
-## Purpose of script: To clean case data
+## Purpose of script: To clean the data for case and control
 ##
 ## Author: Yufan Gong
 ##
