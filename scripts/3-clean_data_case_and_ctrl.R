@@ -424,7 +424,20 @@
                       cd8t,cd4t,nk,bcell,mono,gran,pdstudystudy,
                       pdstudydiseasestatus)
   
-  list(heavy_metal$chemcode, chem_copper$chemcode, chem_op$chemcode) %>% 
+  list(heavy_metal, chem_copper, chem_op) %>% 
+    map(function(chemlist){
+      list(
+        list(exp_wt_case, exp_wt_control),
+        pest_methylation_clean
+      ) %>% 
+        pmap(function(data1, data2){
+          
+        })
+    })
+
+
+  
+  list(heavy_metal, chem_copper, chem_op) %>% 
     map(function(chemlist){
       list(
         list(exp_wt_case[[1]], exp_wt_control[[1]]),
@@ -441,7 +454,7 @@
                   names_from = chemcode,
                   values_from = chemuse_wt_10
                 ) %>% 
-                select(pegid, any_of(chemlist)) %>% 
+                select(pegid, any_of(chemlist$chemcode)) %>% 
                 full_join(datSamplePEG %>%
                             select(all_of(myvar1)), by = "pegid") %>%
                 left_join(datSampleSteve %>%
