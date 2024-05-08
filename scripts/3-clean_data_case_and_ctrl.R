@@ -425,7 +425,71 @@
                       cd8t,cd4t,nk,bcell,mono,gran,pdstudystudy,
                       pdstudydiseasestatus)
   
-  list(heavy_metal$chemcode, chem_copper$chemcode, chem_op$chemcode) %>% 
+  list(heavy_metal, chem_copper, chem_op) %>% 
+    map(function(chemlist){
+      list(
+        list(exp_wt_case, exp_wt_control),
+        pest_methylation_clean
+      ) %>%
+        pmap(function(data1, data2){
+          data1 %>% 
+            map(function(data){
+              list("dur_wt_10", "lb_wt_10", "dur_lb_10") %>% 
+                map(function(var){
+                  data %>% 
+                    select(pegid, chemcode, var) %>% 
+                    pivot_wider(
+                      id_cols = pegid,
+                      names_from = chemcode,
+                      values_from = var
+                    ) %>% 
+                    select(pegid, any_of(chemlist$chemcode)) %>% 
+                    full_join(datSamplePEG %>%
+                                select(all_of(myvar1)), by = "pegid") %>%
+                    left_join(datSampleSteve %>%
+                                select(all_of(myvar2)),
+                              by = "sampleid") %>% 
+                    right_join(data2, by = "pegid") %>% 
+                    mutate(
+                      rfvotecaucasian2 = case_when(
+                        (is.na(rfvotecaucasian) & race == 1) | 
+                          (is.na(rfvotecaucasian) & 
+                             aim_self_ethnicity == "Caucasian") ~ 1,
+                        is.na(rfvotecaucasian) ~ 0.5,
+                        TRUE ~ rfvotecaucasian),
+                      ethnicity = case_when(
+                        is.na(aim_self_ethnicity) | 
+                          aim_self_ethnicity == "Asian" ~ "Other",
+                        TRUE ~ aim_self_ethnicity),
+                      caucasian = if_else(ethnicity == "Caucasian", 0, 1),
+                      gds1_5 = if_else(gds1 < 5, 0, 1),
+                      c11_3 = case_when(
+                        c11_depression == 0 ~ 0,
+                        c11_depression == 1 & (c11_depressionage < age_diag-4) ~ 2,
+                        TRUE ~ 1),
+                      gds5_pd = if_else(
+                        pd_new == "With PD", 1 + gds1_5, 0),
+                      c11_3m = if_else(
+                        pd_new == "With PD", 1 + c11_3, 0),
+                      c11_2 = if_else(
+                        pd_new == "With PD", 1 + c11_depression, 0),
+                      nlr = gran/(cd8t + cd4t + nk + bcell + mono)
+                    ) %>% 
+                    set_value_labels(
+                      female = c("Male" = 0, "Female" = 1)) %>% 
+                    modify_if(is.labelled, to_factor) %>% 
+                    mutate_at(vars(county), fct_drop) 
+                }) %>% 
+                set_names("duration", "intensity", "pound-year")
+            }) %>% 
+            set_names("occupational", "residential")
+        }) %>% 
+        set_names("case", "control")
+    }) %>% 
+    set_names("metal_wt_list", "copper_wt_list", "op_wt_list") %>% 
+    list2env(.GlobalEnv)
+  
+  list(heavy_metal, chem_copper, chem_op) %>% 
     map(function(chemlist){
       list(
         list(exp_wt_case[[1]], exp_wt_control[[1]]),
@@ -436,13 +500,13 @@
           list(df1, df2) %>% 
             map(function(data){
               data %>% 
-                select(pegid,chemcode,chemuse_wt_10) %>% 
+                select(pegid, chemcode, lb_wt_10) %>% 
                 pivot_wider(
                   id_cols = pegid,
                   names_from = chemcode,
-                  values_from = chemuse_wt_10
+                  values_from = lb_wt_10
                 ) %>% 
-                select(pegid, any_of(chemlist)) %>% 
+                select(pegid, any_of(chemlist$chemcode)) %>% 
                 full_join(datSamplePEG %>%
                             select(all_of(myvar1)), by = "pegid") %>%
                 left_join(datSampleSteve %>%
@@ -481,7 +545,7 @@
             }) 
         }) 
     }) %>% 
-    set_names("metal_wt_10", "copper_wt_10", "op_wt_10") %>% 
+    set_names("metal_wt_list", "copper_wt_list", "op_wt_list") %>% 
     list2env(.GlobalEnv)
   
   
