@@ -154,7 +154,7 @@
 #3. clean GRAPES data
 
 {
-  #limit to 1974-indexyr and remove -9999
+  #limit to 1974-2008 and remove -9999
   #and sum across chems for same year and person
   
   list(c_grape_out,r_grape_out) %>% 
@@ -180,7 +180,7 @@
     list2env(.,envir = .GlobalEnv)
   
   
-  #pull in input to get unexposed and limit to 1974-indexyr
+  #pull in input to get unexposed and limit to 1974-2008
   # merge each dataframe from two lists and add zero for unexposed
   list(
     pest_methylation_clean,
@@ -228,11 +228,11 @@
                                 indexyr10, pd_new, study), 
                        by = "pegid") %>% 
             filter(year > 1973) %>% 
-            mutate(exp_yrs_lag_dr = ifelse(year <= indexyr,1,NA),
-                   exp_yrs_lag_5 = ifelse(year <= indexyr5,1,NA),
-                   exp_yrs_lag_10 = ifelse(year <= indexyr10,1,NA)) %>% 
+            mutate(exp_yrs_lag_dr = ifelse(year <= indexyr, 1, NA),
+                   exp_yrs_lag_5 = ifelse(year <= indexyr5, 1, NA),
+                   exp_yrs_lag_10 = ifelse(year <= indexyr10, 1, NA)) %>% 
             group_by(pegid) %>% 
-            summarise_at(vars(starts_with("exp")),~sum(.x,na.rm=T),
+            summarise_at(vars(starts_with("exp")),~sum(.x, na.rm=T),
                          .groups = "keep") %>% 
             mutate(location = data2)
         }) %>% 
