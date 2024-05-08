@@ -65,18 +65,17 @@
       county = c("Fresno"=1, "Kern"=2, "Tulare"=3, "Other" =4)
     )
   
-datSamplePEG %>% 
-  select(pegid, pdstudyparkinsonsdisease, 
+  datSamplePEG %>% 
+    select(pegid, pdstudyparkinsonsdisease, 
            pdstudydate_main_interview_colle, pdstudydatediagnosed, 
            pdstudyphys_apptdate) %>% 
-  filter(!is.na(pdstudyparkinsonsdisease)) %>% 
-  group_by(pdstudyparkinsonsdisease) %>% 
-  group_split() %>% 
-  set_names("control_ids", "case_ids") %>% 
-  list2env(.GlobalEnv)
+    filter(!is.na(pdstudyparkinsonsdisease)) %>% 
+    group_by(pdstudyparkinsonsdisease) %>% 
+    group_split() %>% 
+    set_names("control_ids", "case_ids") %>% 
+    list2env(.GlobalEnv)
   
-  
-peg_keyvars %>% 
+  peg_keyvars %>% 
     full_join(pest_cov_more %>% select(pegid, pd), by = "pegid") %>% 
     full_join(datSamplePEG %>% 
                 select(pegid, pdstudyparkinsonsdisease, age), by = "pegid") %>% 
@@ -101,26 +100,36 @@ peg_keyvars %>%
            indexyr = index_date,
            indexyr5 = indexyr-5,
            indexyr10 = indexyr-10) %>% 
-  filter(!is.na(pd_new)) %>% 
-  group_by(pd_new) %>% 
-  modify_if(is.labelled, to_factor) %>% 
-  mutate_at(vars(pd_new, race_new), fct_rev) %>% 
-  group_split() %>% 
-  set_names("pest_case", "pest_control") %>% 
-  list2env(.GlobalEnv)
-
-pest_methylation_clean <- list(
-  list(pest_case, pest_control),
-  list(case_ids, control_ids)
-) %>% 
-  pmap(function(data1, data2){
-    data1 %>% 
-      filter(pegid %in% data2$pegid)
-  })
-
-
+    filter(!is.na(pd_new)) %>% 
+    group_by(pd_new) %>% 
+    modify_if(is.labelled, to_factor) %>% 
+    mutate_at(vars(pd_new, race_new), fct_rev) %>% 
+    group_split() %>% 
+    set_names("pest_case", "pest_control") %>% 
+    list2env(.GlobalEnv)
   
-  # summary(pest_case_methylation$sex)
+  pest_methylation_clean <- list(
+    list(pest_case, pest_control),
+    list(case_ids, control_ids)
+  ) %>% 
+    pmap(function(data1, data2){
+      data1 %>% 
+        filter(pegid %in% data2$pegid) %>% 
+        # select(-c(date_main_interview_collected, interview_date)) %>% 
+        mutate(pd = if_else(pdstudyparkinsonsdisease == 1, 1, 0)) 
+      # %>%
+      #   mice(m=5, maxit=50, method="pmm", seed=305301666) %>% # impute missing data
+      #   complete(1)
+    }) %>% 
+    set_names("case", "control")
+  
+  pest_methylation_covar <- pest_methylation_clean %>% 
+    reduce(rbind)
+  
+  create_report(pest_methylation_covar, output_dir = here("reports"), 
+                output_file = "covar_report.html")
+  
+
 }
 
 {
@@ -153,20 +162,23 @@ pest_methylation_clean <- list(
       pest_methylation_clean %>% 
         map(function(df){
           data %>% 
-            inner_join(df %>% 
-                         select(pegid, indexyr), by = "pegid") %>% 
-            group_by(pegid) %>% 
-            filter(year > 1973 & year <= indexyr & chempound >= 0) %>% 
-            ungroup() %>% 
+            inner_join(df %>%
+                         select(pegid, indexyr), by = "pegid") %>%
+            group_by(pegid) %>%
+            filter(year > 1973 & year < 2008 & chempound >= 0) %>% 
+            ungroup() %>%
             mutate(chemcode = paste0("chem",chemcode)) %>% 
             group_by(pegid, year, chemcode) %>%
             summarise(sum_total_lbs = sum(chempound),
                       .groups = "keep") %>%
-            ungroup()
-        })
+            ungroup() %>% 
+            distinct()
+        }) %>% 
+        set_names("case", "control")
     }) %>% 
-    set_names("c_grape_agg","r_grape_agg") %>% 
+    set_names("c_grape_agg", "r_grape_agg") %>% 
     list2env(.,envir = .GlobalEnv)
+  
   
   #pull in input to get unexposed and limit to 1974-indexyr
   # merge each dataframe from two lists and add zero for unexposed
@@ -177,14 +189,14 @@ pest_methylation_clean <- list(
   ) %>% 
     pmap(function(data1, data2, data3){
       list(
-        list(c_grape_in,r_grape_in) %>% 
+        list(c_grape_in, r_grape_in) %>% 
           map(function(data){
             data %>% 
-              inner_join(data1 %>% 
-                           select(pegid, indexyr), by = "pegid") %>% 
-              group_by(pegid) %>% 
-              filter(year > 1973 & year <= indexyr) %>% 
-              ungroup() %>% 
+              inner_join(data1 %>%
+                           select(pegid, indexyr), by = "pegid") %>%
+              group_by(pegid) %>%
+              filter(year > 1973 & year < 2008) %>% 
+              ungroup() %>%
               select(pegid, year)
           }), 
         list(data2, data3)) %>% 
@@ -192,23 +204,24 @@ pest_methylation_clean <- list(
         map(function(df){
           df %>% 
             mutate(sum_total_lbs = if_else(
-              is.na(sum_total_lbs), 0, sum_total_lbs))
-        })
+              is.na(sum_total_lbs), 0, sum_total_lbs)) %>% 
+            distinct()
+        }) %>% 
+        set_names("occupational", "residential")
     }) %>% 
-    set_names("case_agg_yr_all","control_agg_yr_all") %>% 
+    set_names("case_agg_yr_all", "control_agg_yr_all") %>% 
     list2env(.,envir = .GlobalEnv)
-
 
   
   # Calculate lagged years
   
   pest_methylation_clean %>% 
     map(function(df){
-      list(list(c_grape_in,r_grape_in),
+      list(list(c_grape_in, r_grape_in),
            c("c","r")) %>% 
-        pmap(function(data1,data2){
+        pmap(function(data1, data2){
           data1 %>% 
-            select(pegid,year) %>% 
+            select(pegid, year) %>% 
             distinct() %>% 
             inner_join(df %>% 
                          select(pegid, indexyr, indexyr5, 
@@ -222,7 +235,8 @@ pest_methylation_clean <- list(
             summarise_at(vars(starts_with("exp")),~sum(.x,na.rm=T),
                          .groups = "keep") %>% 
             mutate(location = data2)
-        }) 
+        }) %>% 
+        set_names("occupational", "residential")
     }) %>% 
     set_names("exp_yrs_lag_case_list", "exp_yrs_lag_control_list") %>% 
     list2env(.GlobalEnv)
@@ -245,100 +259,154 @@ pest_methylation_clean <- list(
 }
 
 
-# clean time window ------------------------------------------------------
+
+# clean exposure data -----------------------------------------------------
 
 {
-  #number of years of exposure history
+  #exposure matrix
   list(
-    list(case_agg_yr_all[[1]], control_agg_yr_all[[1]]),
-    list(case_agg_yr_all[[2]], control_agg_yr_all[[2]]),
+    list(case_agg_yr_all, control_agg_yr_all),
     pest_methylation_clean
   ) %>% 
-    pmap(function(data1, data2, data3){
-      list(data1,data2) %>% 
-        map(function(data){
-          data %>% 
-            inner_join(data3 %>% 
+    pmap(function(data, covar){
+      data %>% 
+        map(function(df){
+          df %>% 
+            inner_join(covar %>% 
                          select(pegid, indexyr, pd_new, study), 
-                       by = "pegid") %>% 
-            mutate(window=cut(year,breaks = c(1973, 1989, Inf),
-                              include.lowest = FALSE,
-                              labels = c("1974-1989","1990-index"))) %>% 
-            # filter(year <= indexyr) %>%
-            distinct()     
-          }) 
+                       by = "pegid") %>%
+            group_by(pegid) %>%
+            filter(year <= indexyr) %>%
+            ungroup() %>% 
+            distinct() 
+        }) %>% 
+        set_names("occupational", "residential")
     }) %>% 
-    set_names("exp_window_address_case", "exp_window_address_control") %>% 
+    set_names("exp_address_case", "exp_address_control") %>% 
     list2env(.GlobalEnv)
   
-  exp_window_address_all_list <- list(exp_window_address_case, 
-                                      exp_window_address_control) %>% 
-    pmap(function(data1, data2){
-      rbind(data1, data2)
-    })
-  
-  list(
-    list(exp_window_address_case[[1]], exp_window_address_control[[1]]),
-    list(exp_window_address_case[[2]], exp_window_address_control[[2]]),
-    list(exp_yrs_lag_case_list[[1]], exp_yrs_lag_control_list[[1]]),
-    list(exp_yrs_lag_case_list[[2]], exp_yrs_lag_control_list[[2]]),
-    pest_methylation_clean
-  ) %>% 
-    pmap(function(df1, df2, df3, df4, df5){
-      list(list(df1, df2),
-           list(df3, df4))%>% 
-        pmap(function(data1,data2){
-          data1 %>% 
-            mutate(ind = 1) %>% 
-            #mutate_at(vars(sum_total_lbs), dec_out) %>%
-            group_by(pegid, chemcode, window) %>% 
+  list(list(exp_address_case, exp_address_control),
+       list(exp_yrs_lag_case_list, exp_yrs_lag_control_list),
+       pest_methylation_clean )%>%
+    pmap(function(data, lag, covar){
+      list(data, lag) %>% 
+        pmap(function(data1, data2){
+          data1 %>%
+            group_by(pegid) %>%
+            filter(year <= indexyr - 10) %>% 
+            ungroup() %>% 
+            mutate(ind = 1) %>%
+            replace_na(list(sum_total_lbs = 0)) %>% 
+            group_by(pegid, chemcode) %>%
             summarise(duration = sum(ind),
                       chemuse = sum(sum_total_lbs),
                       .groups = "keep") %>% 
-            # inner_join(pest_cov2 %>% 
-            # select(pegid, pd, study), by = "pegid") %>% 
-            full_join(data2 %>% select(-location), by = "pegid") %>% 
-            right_join(df5, by = "pegid") %>% 
             ungroup() %>% 
-            filter(!is.na(pd) & !is.na(chemuse)) %>% 
-            mutate(chemuse_wt_10 = chemuse/exp_yrs_lag_10,
-                   chemuse_wt_5 = chemuse/exp_yrs_lag_5,
-                   chemuse_wt_dr = chemuse/exp_yrs_lag_dr)
-        }) 
-    }) %>% 
-    set_names("exp_lb_window_case_wt", "exp_lb_window_control_wt") %>% 
+            left_join(data2 %>% select(-location), by = "pegid") %>% 
+            left_join(covar,
+                      by = "pegid") %>% 
+            filter(!is.na(pd) & !is.na(duration)) %>% 
+            mutate(dur_wt_10 = duration/exp_yrs_lag_10,
+                   lb_wt_10 = chemuse/exp_yrs_lag_10,
+                   dur_lb_10 = duration * lb_wt_10)
+        }) %>% 
+        set_names("occupational", "residential")
+    }) %>%
+    set_names("exp_wt_case", "exp_wt_control") %>%
     list2env(.GlobalEnv)
   
-  list(
-    list(exp_window_address_case[[1]], exp_window_address_control[[1]]),
-    list(exp_window_address_case[[2]], exp_window_address_control[[2]]),
-    list(exp_yrs_lag_case_list[[1]], exp_yrs_lag_control_list[[1]]),
-    list(exp_yrs_lag_case_list[[2]], exp_yrs_lag_control_list[[2]]),
-    pest_methylation_clean
-  ) %>% 
-    pmap(function(df1, df2, df3, df4, df5){
-      list(list(df1, df2),
-           list(df3, df4))%>% 
-        pmap(function(data1,data2){
-          data1 %>% 
-            mutate(ind = 1) %>% 
-            #mutate_at(vars(sum_total_lbs), dec_out) %>%
-            group_by(pegid, chemcode) %>% 
-            summarise(duration = sum(ind),
-                      chemuse = sum(sum_total_lbs),
-                      .groups = "keep") %>% 
-            full_join(data2 %>% select(-location), by = "pegid") %>% 
-            right_join(df5, 
-                       by = "pegid") %>% 
-            ungroup() %>% 
-            filter(!is.na(pd) & !is.na(chemuse)) %>% 
-            mutate(chemuse_wt_10 = chemuse/exp_yrs_lag_10,
-                   chemuse_wt_5 = chemuse/exp_yrs_lag_5,
-                   chemuse_wt_dr = chemuse/exp_yrs_lag_dr)
-        }) 
-    }) %>% 
-    set_names("exp_lb_case_wt", "exp_lb_control_wt") %>% 
-    list2env(.GlobalEnv)
+  test <- exp_wt_case[["occupational"]]
+
+  # list(
+  #   list(case_agg_yr_all[[1]], control_agg_yr_all[[1]]),
+  #   list(case_agg_yr_all[[2]], control_agg_yr_all[[2]]),
+  #   pest_methylation_clean
+  # ) %>% 
+  #   pmap(function(data1, data2, data3){
+  #     list(data1,data2) %>% 
+  #       map(function(data){
+  #         data %>% 
+  #           inner_join(data3 %>% 
+  #                        select(pegid, indexyr, pd_new, study), 
+  #                      by = "pegid") %>% 
+  #           mutate(window=cut(year,breaks = c(1973, 1989, Inf),
+  #                             include.lowest = FALSE,
+  #                             labels = c("1974-1989","1990-index"))) %>% 
+  #           # filter(year <= indexyr) %>%
+  #           distinct()     
+  #         }) 
+  #   }) %>% 
+  #   set_names("exp_window_address_case", "exp_window_address_control") %>% 
+  #   list2env(.GlobalEnv)
+  
+  # exp_window_address_all_list <- list(exp_window_address_case, 
+  #                                     exp_window_address_control) %>% 
+  #   pmap(function(data1, data2){
+  #     rbind(data1, data2)
+  #   })
+  # 
+  # list(
+  #   list(exp_window_address_case[[1]], exp_window_address_control[[1]]),
+  #   list(exp_window_address_case[[2]], exp_window_address_control[[2]]),
+  #   list(exp_yrs_lag_case_list[[1]], exp_yrs_lag_control_list[[1]]),
+  #   list(exp_yrs_lag_case_list[[2]], exp_yrs_lag_control_list[[2]]),
+  #   pest_methylation_clean
+  # ) %>% 
+  #   pmap(function(df1, df2, df3, df4, df5){
+  #     list(list(df1, df2),
+  #          list(df3, df4))%>% 
+  #       pmap(function(data1,data2){
+  #         data1 %>% 
+  #           mutate(ind = 1) %>% 
+  #           #mutate_at(vars(sum_total_lbs), dec_out) %>%
+  #           group_by(pegid, chemcode, window) %>% 
+  #           summarise(duration = sum(ind),
+  #                     chemuse = sum(sum_total_lbs),
+  #                     .groups = "keep") %>% 
+  #           # inner_join(pest_cov2 %>% 
+  #           # select(pegid, pd, study), by = "pegid") %>% 
+  #           full_join(data2 %>% select(-location), by = "pegid") %>% 
+  #           right_join(df5, by = "pegid") %>% 
+  #           ungroup() %>% 
+  #           filter(!is.na(pd) & !is.na(chemuse)) %>% 
+  #           mutate(chemuse_wt_10 = chemuse/exp_yrs_lag_10,
+  #                  chemuse_wt_5 = chemuse/exp_yrs_lag_5,
+  #                  chemuse_wt_dr = chemuse/exp_yrs_lag_dr)
+  #       }) 
+  #   }) %>% 
+  #   set_names("exp_lb_window_case_wt", "exp_lb_window_control_wt") %>% 
+  #   list2env(.GlobalEnv)
+  
+  # list(
+  #   list(exp_window_address_case[[1]], exp_window_address_control[[1]]),
+  #   list(exp_window_address_case[[2]], exp_window_address_control[[2]]),
+  #   list(exp_yrs_lag_case_list[[1]], exp_yrs_lag_control_list[[1]]),
+  #   list(exp_yrs_lag_case_list[[2]], exp_yrs_lag_control_list[[2]]),
+  #   pest_methylation_clean
+  # ) %>% 
+  #   pmap(function(df1, df2, df3, df4, df5){
+  #     list(list(df1, df2),
+  #          list(df3, df4))%>% 
+  #       pmap(function(data1,data2){
+  #         data1 %>% 
+  #           mutate(ind = 1) %>% 
+  #           #mutate_at(vars(sum_total_lbs), dec_out) %>%
+  #           group_by(pegid, chemcode) %>% 
+  #           summarise(duration = sum(ind),
+  #                     chemuse = sum(sum_total_lbs),
+  #                     .groups = "keep") %>% 
+  #           full_join(data2 %>% select(-location), by = "pegid") %>% 
+  #           right_join(df5, 
+  #                      by = "pegid") %>% 
+  #           ungroup() %>% 
+  #           filter(!is.na(pd) & !is.na(chemuse)) %>% 
+  #           mutate(chemuse_wt_10 = chemuse/exp_yrs_lag_10,
+  #                  chemuse_wt_5 = chemuse/exp_yrs_lag_5,
+  #                  chemuse_wt_dr = chemuse/exp_yrs_lag_dr)
+  #       }) 
+  #   }) %>% 
+  #   set_names("exp_lb_case_wt", "exp_lb_control_wt") %>% 
+  #   list2env(.GlobalEnv)
 
   
 }
@@ -359,8 +427,8 @@ pest_methylation_clean <- list(
   list(heavy_metal$chemcode, chem_copper$chemcode, chem_op$chemcode) %>% 
     map(function(chemlist){
       list(
-        list(exp_lb_case_wt[[1]], exp_lb_control_wt[[1]]),
-        list(exp_lb_case_wt[[2]], exp_lb_control_wt[[2]]),
+        list(exp_wt_case[[1]], exp_wt_control[[1]]),
+        list(exp_wt_case[[2]], exp_wt_control[[2]]),
         pest_methylation_clean
       ) %>% 
         pmap(function(df1, df2, df3){
@@ -412,7 +480,7 @@ pest_methylation_clean <- list(
             }) 
         }) 
     }) %>% 
-    set_names("lb_sd_metal_wt_10", "lb_sd_copper_wt_10", "lb_sd_op_wt_10") %>% 
+    set_names("metal_wt_10", "copper_wt_10", "op_wt_10") %>% 
     list2env(.GlobalEnv)
   
   
