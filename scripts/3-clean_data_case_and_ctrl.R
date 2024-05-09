@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ## ---------------------------
 ##
 ## Script name: 3-clean_data_case_and_ctrl.R
@@ -654,54 +653,115 @@
   
   #drop pegids which are not in grape in/out data & z-transform
   
-  id_remove_c <- c("10259MK15", "10818RH27", "11022FC23", 
-                   "11887JA27", "12158FS27", "12313LH31", "85491MA39") 
-  id_remove_r <- c("11887JA27")
-  
+  # id_remove_c <- c("10259MK15", "10818RH27", "11022FC23", 
+  #                  "11887JA27", "12158FS27", "12313LH31", "85491MA39") 
+  # id_remove_r <- c("11887JA27")
   
   
   list(
     list(metal_wt_list, copper_wt_list, op_wt_list),
     list(metal_todrop, copper_todrop, op_todrop)
   ) %>% 
-    pmap(function(df, chem){
-      list(create_quantile, create_evernever, 
-           create_ztrans, create_counts) %>% 
-        map(function(method){
-          list(
-            df %>% 
-              map(function(data){
-                data[[1]]
-              }),
-            df %>% 
-              map(function(data){
-                data[[2]]
-              }),
-            list(chem, chem)
-          ) %>% 
-            pmap(function(df1, df2, df3){
+    pmap(function(datalist, chem_todrop){
+      datalist %>% 
+        map(function(dflist){
+          dflist %>% 
+            map(function(datals){
               list(
-                list(df1, df2),
-                list(id_remove_c, id_remove_r)
+                datals,
+                list(`as.numeric`, `extreme_remove_percentile_win`, 
+                     `extreme_remove_percentile_win`)
               ) %>% 
-                pmap(function(data1, data2){
-                  data1 %>% 
-                    select(-any_of(df3)) %>%
-                    filter(pegid %notin% data2 & !is.na(pegid)) %>%
-                    mutate_at(vars(starts_with("chem")), 
-                              ~extreme_remove_percentile_win(.x)) %>%
-                    mutate_at(vars(starts_with("chem")),
-                              ~replace(., is.na(.)|!is.finite(.), 0) 
-                              %>% as.vector()) %>% 
-                    method
-                }) 
-            }) 
+                pmap(function(df, fun){
+                  list(create_quantile, create_evernever, 
+                       create_ztrans, `create_counts`) %>% 
+                    map(function(method){
+                      df %>% 
+                        select(-any_of(chem_todrop)) %>%
+                        mutate_at(
+                          vars(starts_with("chem")),
+                          ~replace(.x, is.na(.x)|!is.finite(.x), 0)) %>% 
+                        mutate_at(vars(starts_with("chem")), fun) %>% 
+                        method
+                    }) %>% 
+                    set_names("quantile", "evernever", "ztrans", "count")
+                })
+            })
         }) 
+    }) %>% 
+    map(function(datalist_processed){
+      list(
+        datalist_processed,
+        list(datalist_processed[["control"]], datalist_processed[["control"]])
+      ) %>% 
+        pmap(function(dflist1_processed, dflist2_processed){
+          list(dflist1_processed, dflist2_processed) %>% 
+            pmap(function(datals1_processed, datals2_processed){
+              list(datals1_processed, datals2_processed) %>% 
+                pmap(function(df1_processed, df2_processed){
+                  list(df1_processed[["quantile"]],
+                       df1_processed[["evernever"]],
+                       df1_processed[["ztrans"]],
+                       df1_processed[["count"]] %>% 
+                         mutate(
+                           count = rowSums(
+                             across(starts_with("chem"), 
+                                    ~. > median(df2_processed[["count"]][[cur_column()]])))) %>% 
+                         select(-starts_with("chem")) %>% 
+                         relocate(pegid, count)
+                       ) %>% 
+                    set_names("quantile", "evernever", "ztrans", "count")
+                })
+            })
+        })
     }) %>% 
     set_names("metal_wt_list_processed", 
               "copper_wt_list_processed",
               "op_wt_list_processed") %>% 
     list2env(.GlobalEnv)
+  
+  # list(
+  #   list(metal_wt_list, copper_wt_list, op_wt_list),
+  #   list(metal_todrop, copper_todrop, op_todrop)
+  # ) %>% 
+  #   pmap(function(df, chem){
+  #     list(create_quantile, create_evernever, 
+  #          create_ztrans, create_counts) %>% 
+  #       map(function(method){
+  #         list(
+  #           df %>% 
+  #             map(function(data){
+  #               data[[1]]
+  #             }),
+  #           df %>% 
+  #             map(function(data){
+  #               data[[2]]
+  #             }),
+  #           list(chem, chem)
+  #         ) %>% 
+  #           pmap(function(df1, df2, df3){
+  #             list(
+  #               list(df1, df2),
+  #               list(id_remove_c, id_remove_r)
+  #             ) %>% 
+  #               pmap(function(data1, data2){
+  #                 data1 %>% 
+  #                   select(-any_of(df3)) %>%
+  #                   filter(pegid %notin% data2 & !is.na(pegid)) %>%
+  #                   mutate_at(vars(starts_with("chem")), 
+  #                             ~extreme_remove_percentile_win(.x)) %>%
+  #                   mutate_at(vars(starts_with("chem")),
+  #                             ~replace(., is.na(.)|!is.finite(.), 0) 
+  #                             %>% as.vector()) %>% 
+  #                   method
+  #               }) 
+  #           }) 
+  #       }) 
+  #   }) %>% 
+  #   set_names("metal_wt_list_processed", 
+  #             "copper_wt_list_processed",
+  #             "op_wt_list_processed") %>% 
+  #   list2env(.GlobalEnv)
   
   # lb_sd_metal_wt_10_processed %>% 
   #   set_names("lb_sd_wt_10_quantile_metal", 
@@ -714,60 +774,125 @@
   
   # further process with count data
   
-list(lb_sd_metal_wt_10_processed, lb_sd_copper_wt_10_processed, 
-     lb_sd_op_wt_10_processed) %>% 
-    map(function(df){
-      list(
-        df[[4]],
-        list(df[[4]][[2]], 
-             df[[4]][[2]])
-      ) %>% 
-        map(function(dflist){
-          dflist %>% 
-            pmap(function(df1, df2){
-              df1 %>% 
-                mutate(
-                  count = rowSums(
-                    across(starts_with("chem"), 
-                           ~. > median(df2[[cur_column()]])))
-                  # ,
-                  # copper_count = rowSums(
-                  #   across(matches(chem_copper), 
-                  #          ~. > median(df2[[cur_column()]])))
-                ) %>% 
-                select(-starts_with("chem")) %>% 
-                relocate(pegid, count)
-            })
-        }) 
-    }) %>% 
-    set_names("lb_sd_metal_wt_10_count", 
-              "lb_sd_copper_wt_10_count",
-              "lb_sd_op_wt_10_count") %>% 
-    list2env(.GlobalEnv)
+  # test <- list(
+  #   list(
+  #     metal_wt_list_processed[["case"]][["occupational"]][["intensity"]][["count"]],
+  #     metal_wt_list_processed[["control"]][["occupational"]][["intensity"]][["count"]]
+  #   ), 
+  #   list(
+  #     metal_wt_list_processed[["control"]][["occupational"]][["intensity"]][["count"]],
+  #     metal_wt_list_processed[["control"]][["occupational"]][["intensity"]][["count"]]
+  #   ) 
+  # ) %>% 
+  #   pmap(function(df1, df2){
+  #     df1 %>% 
+  #       mutate(
+  #         count = rowSums(
+  #           across(starts_with("chem"), 
+  #                  ~. > median(df2[[cur_column()]])))
+  #         # ,
+  #         # copper_count = rowSums(
+  #         #   across(matches(chem_copper), 
+  #         #          ~. > median(df2[[cur_column()]])))
+  #       ) %>% 
+  #       select(-starts_with("chem")) %>% 
+  #       relocate(pegid, count)
+  #   })
+  
+  # list(metal_wt_list_processed, 
+  #      copper_wt_list_processed, 
+  #      op_wt_list_processed) %>% 
+  #   map(function(datalist){
+  #     list(
+  #       datalist,
+  #       list(datalist[["control"]], datalist[["control"]])
+  #     ) %>% 
+  #       pmap(function(dflist1, dflist2){
+  #         list(dflist1, dflist2) %>% 
+  #           pmap(function(datals1, datals2){
+  #             list(datals1, datals2) %>% 
+  #               pmap(function(df1, df2){
+  #                 df1[["count"]] %>% 
+  #                   mutate(
+  #                     count = rowSums(
+  #                       across(starts_with("chem"), 
+  #                              ~. > median(df2[["count"]][[cur_column()]])))
+  #                     # ,
+  #                     # copper_count = rowSums(
+  #                     #   across(matches(chem_copper), 
+  #                     #          ~. > median(df2[[cur_column()]])))
+  #                   ) %>% 
+  #                   select(-starts_with("chem")) %>% 
+  #                   relocate(pegid, count)
+  #               })
+  #           })
+  #       })
+  #   }) %>% 
+  #   set_names("metal_wt_count_list_processed", 
+  #             "copper_wt_count_list_processed",
+  #             "op_wt_count_list_processed") %>% 
+  #   list2env(.GlobalEnv)
+  
+
+
+  
+# list(lb_sd_metal_wt_10_processed, lb_sd_copper_wt_10_processed, 
+#      lb_sd_op_wt_10_processed) %>% 
+#     map(function(df){
+#       list(
+#         df[[4]],
+#         list(df[[4]][[2]], 
+#              df[[4]][[2]])
+#       ) %>% 
+#         map(function(dflist){
+#           dflist %>% 
+#             pmap(function(df1, df2){
+#               df1 %>% 
+#                 mutate(
+#                   count = rowSums(
+#                     across(starts_with("chem"), 
+#                            ~. > median(df2[[cur_column()]])))
+#                   # ,
+#                   # copper_count = rowSums(
+#                   #   across(matches(chem_copper), 
+#                   #          ~. > median(df2[[cur_column()]])))
+#                 ) %>% 
+#                 select(-starts_with("chem")) %>% 
+#                 relocate(pegid, count)
+#             })
+#         }) 
+#     }) %>% 
+#     set_names("lb_sd_metal_wt_10_count", 
+#               "lb_sd_copper_wt_10_count",
+#               "lb_sd_op_wt_10_count") %>% 
+#     list2env(.GlobalEnv)
+  
+
+    
+  
+  # list(
+  #   c(lb_sd_metal_wt_10_count[[1]], lb_sd_metal_wt_10_count[[2]]),
+  #   list(id_remove_c, id_remove_r, id_remove_c, id_remove_r)
+  # ) %>% 
+  #   pmap(function(data1, data2){
+  #     data1 %>% 
+  #       filter(pegid %notin% data2 & !is.na(pegid)) %>% 
+  #       pull(sampleid) 
+  #   }) %>% 
+  #   set_names("sampleid_pd_c", "sampleid_pd_r",
+  #             "sampleid_ctrl_c", "sampleid_ctrl_r") %>% 
+  #   list2env(.,envir = .GlobalEnv)
+  
+  peg_noob_nors_win_total <- list(PEG_NOOB_nors_win_filter_ctrl_r, 
+                                  PEG_NOOB_nors_win_filter_pd_r) %>% 
+    bind_cols()
+  
+  combined_resid_total <- list(combined_resid_filter_ctrl_r, 
+                               combined_resid_filter_pd_r) %>% 
+    bind_cols()
   
 }
 
 
-
-list(
-  c(lb_sd_metal_wt_10_count[[1]], lb_sd_metal_wt_10_count[[2]]),
-  list(id_remove_c, id_remove_r, id_remove_c, id_remove_r)
-) %>% 
-  pmap(function(data1, data2){
-    data1 %>% 
-      filter(pegid %notin% data2 & !is.na(pegid)) %>% 
-      pull(sampleid) 
-  }) %>% 
-  set_names("sampleid_pd_c","sampleid_pd_r",
-            "sampleid_ctrl_c","sampleid_ctrl_r") %>% 
-  list2env(.,envir = .GlobalEnv)
-
-peg_noob_nors_win_total <- list(PEG_NOOB_nors_win_filter_ctrl_r, 
-                                PEG_NOOB_nors_win_filter_pd_r) %>% 
-  bind_cols()
-
-combined_resid_total <- list(combined_resid_filter_ctrl_r, 
-                             combined_resid_filter_pd_r) %>% 
-  bind_cols()
 
 #--------------------------------End of the code--------------------------------
