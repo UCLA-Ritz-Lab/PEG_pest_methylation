@@ -370,7 +370,8 @@
                       gds1_5 = if_else(gds1 < 5, 0, 1),
                       c11_3 = case_when(
                         c11_depression == 0 ~ 0,
-                        c11_depression == 1 & (c11_depressionage < age_diag-4) ~ 2,
+                        c11_depression == 1 & 
+                          (c11_depressionage < age_diag-4) ~ 2,
                         TRUE ~ 1),
                       gds5_pd = if_else(
                         pd_new == "With PD", 1 + gds1_5, 0),
@@ -449,7 +450,8 @@
        op_long_combine_list) %>% 
     map(function(df){
       df %>% 
-        reduce(inner_join, by = c("chemname", "chemcode", "chem class (pan)")) %>% 
+        reduce(inner_join, 
+               by = c("chemname", "chemcode", "chem class (pan)")) %>% 
         rename(case = `With PD`,
                control = `Without PD`) %>%
         mutate(n_exp = case + control,
@@ -546,8 +548,14 @@
                        df1_processed[["count"]] %>% 
                          mutate(
                            count = rowSums(
-                             across(starts_with("chem"), 
-                                    ~. > median(df2_processed[["count"]][[cur_column()]])))) %>% 
+                             across(
+                               starts_with("chem"), 
+                               ~. > median(
+                                 df2_processed[["count"]][[cur_column()]]
+                                 )
+                               )
+                             )
+                           ) %>% 
                          select(-starts_with("chem")) %>% 
                          relocate(pegid, count)
                        ) %>% 
