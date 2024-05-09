@@ -117,9 +117,6 @@
         filter(pegid %in% data2$pegid) %>% 
         # select(-c(date_main_interview_collected, interview_date)) %>% 
         mutate(pd = if_else(pdstudyparkinsonsdisease == 1, 1, 0)) 
-      # %>%
-      #   mice(m=5, maxit=50, method="pmm", seed=305301666) %>% # impute missing data
-      #   complete(1)
     }) %>% 
     set_names("case", "control")
   
