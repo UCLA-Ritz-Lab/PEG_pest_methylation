@@ -26,19 +26,18 @@ myvar <- quote_all(pegid, sampleid, age, pd_new,female,
 
 
 #using count data
-list(lb_sd_metal_wt_10_count, lb_sd_copper_wt_10_count, 
-     lb_sd_op_wt_10_count) %>% 
-  map(function(df){
-    list(
-      df[[1]], df[[2]]
-    ) %>% 
-      map(function(datalist){
-        datalist %>% 
+
+list(metal_wt_list_processed, copper_wt_list_processed, 
+     op_wt_list_processed) %>%
+  map(function(datalist){
+    datalist %>% 
+      map(function(dflist){
+        dflist %>% 
           map(function(data){
-            data %>% 
-              dplyr::select(pegid, count)
+            data[["intensity"]][["count"]] %>% 
+                  select(pegid, count)
           }) %>% 
-          purrr::reduce(full_join, by = "pegid") %>% 
+          reduce(full_join, by = "pegid") %>% 
           mutate_all(~replace(., is.na(.), 0)) %>% 
           transmute(pegid = pegid,
                     total = count.x + count.y)
@@ -48,6 +47,8 @@ list(lb_sd_metal_wt_10_count, lb_sd_copper_wt_10_count,
             "count_combine_copper",
             "count_combine_op") %>% 
   list2env(.GlobalEnv)
+
+
 
 list(count_combine_metal, count_combine_copper, count_combine_op) %>% 
   map(function(data){
@@ -69,34 +70,34 @@ hist(count_combine_op_total$total)
 skim(count_combine_op_total$total)
 
 
-c(lb_sd_metal_wt_10_count[[1]], 
-  lb_sd_metal_wt_10_count[[2]]) %>% 
-  map(function(data){
-    data %>% 
-      dplyr::select(all_of(myvar))
-  }) %>% 
-  rbindlist() %>% 
-  left_join(count_combine_copper_total, by = "pegid") %>% 
-  left_join(count_combine_op_total %>% 
-              dplyr::select(pegid, total), by = "pegid") %>%
+# create table 1
+pest_methylation_covar %>% 
+  left_join(datSamplePEG %>% 
+              select(pegid, female, meanmethbysample), by = "pegid") %>% 
+  left_join(count_combine_copper_total, by = "pegid") %>%
+  left_join(count_combine_op_total, by = "pegid") %>% 
   set_variable_labels(
     pegid = "PEGID",
     age = "Age",
     pd_new = "PD status",
     female = "Sex",
-    #race_new = "Race/Ethnicity",
-    ethnicity = "Ethnicity",
+    race_new = "Race/Ethnicity",
+    minority = "Minority",
     smokers = "Smoking status",
-    pdstudystudy = "PEG study",
-    meanmethbysample = "Mean methylation",
+    study = "PEG study",
     a1_schyrs = "School years",
+    county = "County",
     total.x = "Copper count",
     total.y = "OP count",
-    county = "County"
+    meanmethbysample = "Mean methylation level"
   ) %>% 
+  set_value_labels(
+    female = c("Male" = 0, "Female" = 1)) %>% 
+  modify_if(is.labelled, to_factor) %>% 
+  mutate_at(vars(county), fct_drop) %>% 
   distinct() %>% 
-  #filter(pegid %in% datSampleSteve$externaldnacode) %>% 
-  dplyr::select(-c(sampleid,pegid, pdstudystudy, county, a1_schyrs)) %>%
+  select(age, female, race_new, smokers, a1_schyrs, county, pd_new, 
+         meanmethbysample, total.x, total.y) %>% 
   tbl_summary(missing = "no",
               by = pd_new,
               #type=list(c(female) ~ "categorical"),
@@ -110,6 +111,7 @@ c(lb_sd_metal_wt_10_count[[1]],
   modify_caption("Table 1. Demographic characteristics of PEG participants (N = {N})") %>%
   bold_labels() %>% 
   table1()
+
 
 
 #heavy metal chemical use in total
@@ -279,33 +281,33 @@ dev.off()
 
 
 #Method 1: ChAMP
-library(ChAMP)
-
-list(
-  count_combine_metal,
-  list(combined_resid_filter_pd_r, combined_resid_filter_ctrl_r)
-) %>% 
-  pmap(function(data1, data2){
-    data1 %>% 
-      select(total) %>% 
-      map(~champ.DMP(beta = data2, pheno = .x, 
-                     compare.group = NULL, 
-                     adjPVal = 0.05, adjust.method = "BH", 
-                     arraytype = "450K")[[1]])
-  }) %>% 
-  set_names("dmp_count_case", "dmp_count_ctrl") %>% 
-  list2env(.GlobalEnv)
-
-
-DMP.GUI(DMP = dmp_count_case[[1]], 
-        beta = as.matrix(combined_resid_filter_pd_r), 
-        pheno = count_combine_case$total,
-        cutgroupnumber = 2)
-
-DMP.GUI(DMP = dmp_count_ctrl[[1]], 
-        beta = as.matrix(combined_resid_filter_ctrl_r), 
-        pheno = count_combine_ctrl$total,
-        cutgroupnumber = 2)
+# library(ChAMP)
+# 
+# list(
+#   count_combine_metal,
+#   list(combined_resid_filter_pd_r, combined_resid_filter_ctrl_r)
+# ) %>% 
+#   pmap(function(data1, data2){
+#     data1 %>% 
+#       select(total) %>% 
+#       map(~champ.DMP(beta = data2, pheno = .x, 
+#                      compare.group = NULL, 
+#                      adjPVal = 0.05, adjust.method = "BH", 
+#                      arraytype = "450K")[[1]])
+#   }) %>% 
+#   set_names("dmp_count_case", "dmp_count_ctrl") %>% 
+#   list2env(.GlobalEnv)
+# 
+# 
+# DMP.GUI(DMP = dmp_count_case[[1]], 
+#         beta = as.matrix(combined_resid_filter_pd_r), 
+#         pheno = count_combine_case$total,
+#         cutgroupnumber = 2)
+# 
+# DMP.GUI(DMP = dmp_count_ctrl[[1]], 
+#         beta = as.matrix(combined_resid_filter_ctrl_r), 
+#         pheno = count_combine_ctrl$total,
+#         cutgroupnumber = 2)
 
 
 
@@ -323,6 +325,21 @@ myvars_ewas <- quote_all(cd8t, cd4t, nk, mono, bcell, gran,
 
 
 #select covariates
+
+list(copper_wt_list_processed, 
+     count_combine_op) %>%
+  pmap(function(datalist, df){
+    datalist[["occupational"]][["intensity"]][["count"]] %>% 
+      select(pegid, all_of(myvars_ewas)) %>% 
+      left_join(df, by = "pegid") %>% 
+      na.omit()
+  }) %>% 
+  set_names("covar_case", "covar_control") %>% 
+  list2env(.GlobalEnv)
+
+test <- covar_copper[["control"]]
+
+
 list(lb_sd_copper_wt_10_count, lb_sd_op_wt_10_count) %>%
   pmap(function(df1, df2){
     list(df1, df2) %>%
