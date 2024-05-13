@@ -129,6 +129,7 @@
 
 }
 
+#2. clean chemical list
 {
   # list(c_dur_nolag_dr,r_dur_nolag_dr) %>% 
   #   map(function(data){
@@ -254,7 +255,6 @@
     set_names("exp_yrs_lag_case", "exp_yrs_lag_control") %>% 
     list2env(.GlobalEnv)
 }
-
 
 
 # clean exposure data -----------------------------------------------------
