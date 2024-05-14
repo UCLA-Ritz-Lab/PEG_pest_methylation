@@ -105,6 +105,7 @@ pest_methylation_covar %>%
                                all_categorical() ~ "{n} ({p}%)"),
               digits = list(all_continuous() ~ 1,
                             all_categorical() ~ 1)) %>%
+  add_n() %>%
   add_overall() %>% 
   modify_header(label = "**Characteristics**") %>%
   # modify_spanning_header(starts_with("stat_") ~ "**PD status**") %>%
@@ -332,60 +333,29 @@ list(copper_wt_list_processed,
     datalist[["occupational"]][["intensity"]][["count"]] %>% 
       select(pegid, all_of(myvars_ewas)) %>% 
       left_join(df, by = "pegid") %>% 
-      na.omit()
+      na.omit() %>% 
+      column_to_rownames("pegid")
   }) %>% 
   set_names("covar_case", "covar_control") %>% 
   list2env(.GlobalEnv)
 
-test <- covar_copper[["control"]]
-
-
-list(lb_sd_copper_wt_10_count, lb_sd_op_wt_10_count) %>%
-  pmap(function(df1, df2){
-    list(df1, df2) %>%
-      pmap(function(data1, data2){
-        data1 %>%
-          dplyr::select(pegid, all_of(myvars_ewas)) %>%
-          left_join(data2 %>%
-                      dplyr::select(pegid, count), by = "pegid") %>%
-          # dplyr::select(-pegid) %>%
-          # rename(pdyears = pdstudynumberyearswithpdatbloodd) %>%
-          # mutate(pdyears = ifelse(is.na(pdyears),
-          #                         mean(pdyears, na.rm=TRUE), pdyears)) %>%
-          # replace_na(list(pdyears = 0)) %>%
-          na.omit()
-        #replace_na(list(c11_depression = 0,gds1_5 = 0)) %>%
-      })
-  }) %>%
-  set_names("covar_case_process", "covar_ctrl_process") %>%
-  list2env(.,envir = .GlobalEnv)
-
-
-covar_case_combind <- covar_case_process[[2]] %>% 
-  left_join(count_combine_op[[1]], by = "pegid") %>% 
-  dplyr::select(-c(pegid, count)) %>% 
-  dplyr::rename(count = total)
-  
-covar_ctrl_combind <- covar_ctrl_process[[2]] %>% 
-  left_join(count_combine_op[[2]], by = "pegid") %>% 
-  dplyr::select(-c(pegid, count, study)) %>% 
-  dplyr::rename(count = total)
-
-
 covar_total <- list(
-  list(covar_ctrl_combind, covar_case_combind),
-  c("ctrl", "case")
+  list(covar_case, covar_control),
+  c("With PD", "Without PD")
 ) %>% 
   pmap(function(data1, data2){
     data1 %>% 
       mutate(pd = data2) 
   }) %>% 
-  bind_rows() %>% 
-  mutate(study = if_else(is.na(study), "PEG 1", study))
+  bind_rows() 
+
+covar_control %<>%
+  select(-study)
+
 
 ewas.parameters <- meffil.ewas.parameters(
-  sig.threshold=1e-6,  ## EWAS p-value threshold
-  max.plots=20, ## plot at most 20 CpG sites
+  sig.threshold = 1e-6,  ## EWAS p-value threshold
+  max.plots = 20, ## plot at most 20 CpG sites
   qq.inflation.method="median",  ## measure inflation using median
   model="all") ## select default EWAS model; 
 

@@ -352,6 +352,9 @@
                                 select(all_of(myvar2)),
                               by = "sampleid") %>% 
                     right_join(data2, by = "pegid") %>% 
+                    filter(
+                      sampleid %in% names(PEG_NOOB_nors_win_filter_ctrl_r) |
+                        sampleid %in% names(PEG_NOOB_nors_win_filter_pd_r)) %>%
                     mutate(
                       rfvotecaucasian2 = case_when(
                         (is.na(rfvotecaucasian) & race == 1) | 
