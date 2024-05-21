@@ -290,7 +290,7 @@
         pmap(function(data1, data2){
           data1 %>%
             group_by(pegid) %>%
-            filter(year <= indexyr - 10) %>% 
+            filter(year <= indexyr) %>% 
             ungroup() %>% 
             mutate(ind = 1) %>%
             replace_na(list(sum_total_lbs = 0)) %>% 
@@ -303,9 +303,9 @@
             left_join(covar,
                       by = "pegid") %>% 
             filter(!is.na(pd) & !is.na(duration)) %>% 
-            mutate(dur_wt_10 = duration/exp_yrs_lag_10,
-                   lb_wt_10 = chemuse/exp_yrs_lag_10,
-                   dur_lb_10 = duration * lb_wt_10)
+            mutate(dur_wt_dr = duration/exp_yrs_lag_dr,
+                   lb_wt_dr = chemuse/exp_yrs_lag_dr,
+                   dur_lb_dr = duration * lb_wt_dr)
         }) %>% 
         set_names("occupational", "residential")
     }) %>%
@@ -336,7 +336,7 @@
         pmap(function(data1, data2){
           data1 %>% 
             map(function(data){
-              list("dur_wt_10", "lb_wt_10", "dur_lb_10") %>% 
+              list("dur_wt_dr", "lb_wt_dr", "dur_lb_dr") %>% 
                 map(function(var){
                   data %>% 
                     select(pegid, chemcode, var) %>% 
@@ -412,7 +412,7 @@
                 filter(pegid %in% data2$pegid & 
                          chemcode %in% chemlist$chemcode) %>%
                 group_by(pegid) %>%
-                filter(year <= indexyr - 10) %>%
+                filter(year <= indexyr) %>%
                 ungroup()
             }) %>% 
             bind_rows() %>% 

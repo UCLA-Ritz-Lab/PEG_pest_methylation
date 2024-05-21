@@ -99,7 +99,8 @@
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
     base::grep("noob",., 
          value=TRUE, ignore.case = TRUE) %>%
-    discard(~str_detect(.x,"raw|old|new|archive|nors_filter|_c")) %>%
+    keep(~str_detect(.x,"filter_ctrl|filter_pd")) %>%
+    discard(~str_detect(.x,"old|archive|nors_filter|l_c|d_c")) %>%
     map(.,load,.GlobalEnv)
   
   

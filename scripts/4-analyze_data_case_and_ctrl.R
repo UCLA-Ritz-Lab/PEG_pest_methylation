@@ -24,6 +24,28 @@ myvar <- quote_all(pegid, sampleid, age, pd_new,female,
                    smokers, a1_schyrs, ethnicity, county,
                    pdstudystudy, meanmethbysample)
 
+# using z-score data
+
+list(metal_wt_list_processed, copper_wt_list_processed, 
+     op_wt_list_processed) %>%
+  map(function(datalist){
+    datalist %>% 
+      map(function(dflist){
+        dflist %>% 
+          map(function(data){
+            data %>% 
+              map(function(df){
+                df[["ztrans"]] %>% 
+                  dplyr::select(pegid, starts_with("chem"))
+              })
+          }) 
+      })
+  }) %>% 
+  set_names("ztrans_metal", 
+            "ztrans_copper",
+            "ztrans_op") %>% 
+  list2env(.GlobalEnv)
+
 
 #using count data
 
@@ -314,8 +336,8 @@ dev.off()
 
 #Method 2: meffil
 # Load meffil and set how many cores to use for parallelization
-source(here("scripts", "meffil_fixed.R"))
-source(here("scripts", "meffil_report_fixed.R"))
+# source(here("scripts", "meffil_fixed.R"))
+# source(here("scripts", "meffil_report_fixed.R"))
 library(meffil)
 myvars_ewas <- quote_all(cd8t, cd4t, nk, mono, bcell, gran, 
                          age, female, smokers, rfvotecaucasian2, study)
@@ -331,7 +353,7 @@ list(copper_wt_list_processed,
      count_combine_op) %>%
   pmap(function(datalist, df){
     datalist[["occupational"]][["intensity"]][["count"]] %>% 
-      select(pegid, all_of(myvars_ewas)) %>% 
+      dplyr::select(pegid, all_of(myvars_ewas)) %>% 
       left_join(df, by = "pegid") %>% 
       na.omit() %>% 
       column_to_rownames("pegid")
@@ -350,7 +372,7 @@ covar_total <- list(
   bind_rows() 
 
 covar_control %<>%
-  select(-study)
+  dplyr::select(-study)
 
 
 ewas.parameters <- meffil.ewas.parameters(
@@ -359,18 +381,23 @@ ewas.parameters <- meffil.ewas.parameters(
   qq.inflation.method="median",  ## measure inflation using median
   model="all") ## select default EWAS model; 
 
-list(list(count_combine_copper[[1]], count_combine_copper[[2]], 
-          count_combine_copper_total, 
-          count_combine_copper[[1]], count_combine_copper[[2]], 
-          count_combine_copper_total),
-     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total,
-          PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total),
-     list(covar_case_combind %>% dplyr::select(-count), 
-          covar_ctrl_combind %>% dplyr::select(-count), 
-          covar_total %>% dplyr::select(-count),
-          covar_case_combind, covar_ctrl_combind, covar_total)) %>% 
+
+# EWAS analysis
+
+list(
+  list(count_combine_copper[["case"]], count_combine_copper[["control"]], 
+       count_combine_copper_total, 
+       count_combine_copper[["case"]], count_combine_copper[["control"]], 
+       count_combine_copper_total),
+  list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+       peg_noob_nors_win_total,
+       PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+       peg_noob_nors_win_total),
+  list(covar_case %>% dplyr::select(-total), 
+       covar_control %>% dplyr::select(-total), 
+       covar_total %>% dplyr::select(-total),
+       covar_case, covar_control, covar_total)
+) %>% 
   pmap(function(data1,data2,data3){
     data1 %>% 
       dplyr::select(total) %>% 
@@ -381,7 +408,7 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
                         isva = F, sva = F, smartsva = F, n.sv = NULL, 
                         winsorize.pct = NA, robust = TRUE,
                         rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
-                        random.seed = 20230922, lmfit.safer = F, verbose = T))
+                        random.seed = 20240522, lmfit.safer = F, verbose = T))
   }) %>% 
   set_names("meffil_count_noop_case", "meffil_count_noop_ctrl", 
             "meffil_count_noop_total",
@@ -389,9 +416,39 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
             "meffil_count_op_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
+# list(list(count_combine_copper[[1]], count_combine_copper[[2]], 
+#           count_combine_copper_total, 
+#           count_combine_copper[[1]], count_combine_copper[[2]], 
+#           count_combine_copper_total),
+#      list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+#           peg_noob_nors_win_total,
+#           PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+#           peg_noob_nors_win_total),
+#      list(covar_case_combind %>% dplyr::select(-count), 
+#           covar_ctrl_combind %>% dplyr::select(-count), 
+#           covar_total %>% dplyr::select(-count),
+#           covar_case_combind, covar_ctrl_combind, covar_total)) %>% 
+#   pmap(function(data1,data2,data3){
+#     data1 %>% 
+#       dplyr::select(total) %>% 
+#       map(~meffil.ewas( beta=as.matrix(data2), 
+#                         variable=.x, 
+#                         covariates = data3, 
+#                         batch = NULL, weights = NULL,  cell.counts = NULL,
+#                         isva = F, sva = F, smartsva = F, n.sv = NULL, 
+#                         winsorize.pct = NA, robust = TRUE,
+#                         rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
+#                         random.seed = 20230922, lmfit.safer = F, verbose = T))
+#   }) %>% 
+#   set_names("meffil_count_noop_case", "meffil_count_noop_ctrl", 
+#             "meffil_count_noop_total",
+#             "meffil_count_op_case", "meffil_count_op_ctrl", 
+#             "meffil_count_op_total") %>% 
+#   list2env(.,envir = .GlobalEnv)
 
-test <- meffil_count_noop_case$total$analyses$all$table %>% 
-  filter(-log10(p.value) > 6)
+
+test <- meffil_count_op_case$total$analyses$all$table %>% 
+  filter(fdr < 0.05)
 
 
 save(meffil_count_op_case, file = "meffil_count_op_case.RData")
@@ -415,7 +472,7 @@ list(list(meffil_count_op_case,
           peg_noob_nors_win_total)) %>% 
   pmap(function(meffil_list,data){
     meffil_list %>% 
-      map(~ meffil.ewas.summary_fix(.x,data,
+      map(~ meffil.ewas.summary(.x,data,
                                     parameters = ewas.parameters))
   }) %>% 
   set_names("ewas.summary_count_op_case", "ewas.summary_count_op_ctrl", 
