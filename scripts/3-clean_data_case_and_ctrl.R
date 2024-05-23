@@ -152,7 +152,7 @@
 #3. clean GRAPES data
 
 {
-  #limit to 1974-2008 and remove -9999
+  #limit to 1974-indexyr and remove -9999
   #and sum across chems for same year and person
   
   list(c_grape_out,r_grape_out) %>% 
@@ -163,7 +163,7 @@
             inner_join(df %>%
                          select(pegid, indexyr), by = "pegid") %>%
             group_by(pegid) %>%
-            filter(year > 1973 & year < 2008 & chempound >= 0) %>% 
+            filter(year > 1973 & year <= indexyr & chempound >= 0) %>% 
             ungroup() %>%
             mutate(chemcode = paste0("chem",chemcode)) %>% 
             group_by(pegid, year, chemcode) %>%
@@ -178,7 +178,7 @@
     list2env(.,envir = .GlobalEnv)
   
   
-  #pull in input to get unexposed and limit to 1974-2008
+  #pull in input to get unexposed and limit to 1974-indexyr
   # merge each dataframe from two lists and add zero for unexposed
   list(
     pest_methylation_clean,
@@ -193,7 +193,7 @@
               inner_join(data1 %>%
                            select(pegid, indexyr), by = "pegid") %>%
               group_by(pegid) %>%
-              filter(year > 1973 & year < 2008) %>% 
+              filter(year > 1973 & year <= indexyr) %>% 
               ungroup() %>%
               select(pegid, year)
           }), 
@@ -272,9 +272,9 @@
             inner_join(covar %>% 
                          select(pegid, indexyr, pd_new, study), 
                        by = "pegid") %>%
-            group_by(pegid) %>%
-            filter(year <= indexyr) %>%
-            ungroup() %>% 
+            # group_by(pegid) %>%
+            # filter(year <= indexyr) %>%
+            # ungroup() %>% 
             distinct() 
         }) %>% 
         set_names("occupational", "residential")
@@ -289,19 +289,19 @@
       list(data, lag) %>% 
         pmap(function(data1, data2){
           data1 %>%
-            group_by(pegid) %>%
-            filter(year <= indexyr) %>% 
-            ungroup() %>% 
+            # group_by(pegid) %>%
+            # filter(year <= indexyr) %>% 
+            # ungroup() %>% 
             mutate(ind = 1) %>%
             replace_na(list(sum_total_lbs = 0)) %>% 
             group_by(pegid, chemcode) %>%
             summarise(duration = sum(ind),
                       chemuse = sum(sum_total_lbs),
                       .groups = "keep") %>% 
+            full_join(data2 %>% select(-location), by = "pegid") %>% 
+            right_join(covar,
+                       by = "pegid") %>% 
             ungroup() %>% 
-            left_join(data2 %>% select(-location), by = "pegid") %>% 
-            left_join(covar,
-                      by = "pegid") %>% 
             filter(!is.na(pd) & !is.na(duration)) %>% 
             mutate(dur_wt_dr = duration/exp_yrs_lag_dr,
                    lb_wt_dr = chemuse/exp_yrs_lag_dr,
@@ -456,7 +456,7 @@
                control = `Without PD`) %>%
         mutate(n_exp = case + control,
                pct = n_exp/806) %>% 
-        filter(n_exp >= 50 
+        filter(n_exp >= 30 
                # & !is.na(`chem class (pan)`) 
                & !is.na(chemname)
                # & `chem class (pan)` %notin% c("n/a")
@@ -472,8 +472,8 @@
     map(function(df){
       df %>% 
         # filter(n_exp >= 30) %>%
-        # filter(chemcode %notin% c("chem1638", "chem164", "chem283",
-        #                           "chem353", "chem354")) %>%
+        filter(chemcode %notin% c("chem1638", "chem164", "chem283",
+                                  "chem353", "chem354")) %>%
         pull(chemcode) 
     }) %>% 
     set_names("metal_filter", "copper_filter", "op_filter") %>% 
