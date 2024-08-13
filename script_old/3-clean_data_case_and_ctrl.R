@@ -118,7 +118,8 @@ pest_methylation_clean <- list(
       filter(pegid %in% data2$pegid)
   })
 
-
+pest_methylation_clean_total <- pest_methylation_clean %>% 
+  bind_rows()
   
   # summary(pest_case_methylation$sex)
 }
@@ -202,6 +203,34 @@ pest_methylation_clean <- list(
   
   # Calculate lagged years
   
+  list(list(c_grape_in, r_grape_in),
+       c("c","r")) %>%
+    pmap(function(data1, data2){
+      data1 %>%
+        select(pegid, year) %>%
+        distinct() %>%
+        right_join(pest_methylation_clean_total %>%
+                     select(pegid, indexyr, indexyr5, indexyr10, pd, study),
+                   by = "pegid") %>%
+        filter(year > 1973) %>%
+        mutate(exp_yrs_lag_dr = ifelse(year <= indexyr, 1, NA),
+               exp_yrs_lag_5 = ifelse(year <= indexyr5, 1, NA),
+               exp_yrs_lag_10 = ifelse(year <= indexyr10, 1, NA)) %>%
+        group_by(pegid) %>%
+        summarise_at(vars(starts_with("exp")), ~sum(.x, na.rm=T),
+                     .groups = "keep") %>%
+        mutate(location = data2)
+    }) %>%
+    set_names("exp_yrs_lag_c", "exp_yrs_lag_r") %>%
+    list2env(.GlobalEnv)
+  # 
+  # exp_yrs_lag <- list(exp_yrs_lag_c, exp_yrs_lag_r) %>% 
+  #   rbindlist() %>% 
+  #   pivot_wider(id_cols = pegid,
+  #               names_from = location,
+  #               values_from = exp_yrs_lag_dr:exp_yrs_lag_10) %>% 
+  #   mutate_all(~replace(.,is.na(.),0))
+  
   pest_methylation_clean %>% 
     map(function(df){
       list(list(c_grape_in,r_grape_in),
@@ -242,6 +271,10 @@ pest_methylation_clean <- list(
     }) %>% 
     set_names("exp_yrs_lag_case", "exp_yrs_lag_control") %>% 
     list2env(.GlobalEnv)
+  
+  
+  exp_yrs_lag <- list(exp_yrs_lag_case, exp_yrs_lag_control) %>% 
+    bind_rows()
 }
 
 
@@ -412,12 +445,12 @@ pest_methylation_clean <- list(
             }) 
         }) 
     }) %>% 
-    set_names("lb_sd_metal_wt_10", "lb_sd_copper_wt_10", "lb_sd_op_wt_10") %>% 
+    set_names("lb_sd_metal_wt", "lb_sd_copper_wt", "lb_sd_op_wt") %>% 
     list2env(.GlobalEnv)
   
   
   #calculate the n and % of exposure for each chemical: combine
-  list(lb_sd_metal_wt_10, lb_sd_copper_wt_10, lb_sd_op_wt_10) %>% 
+  list(lb_sd_metal_wt, lb_sd_copper_wt, lb_sd_op_wt) %>% 
     map(function(df){
       list(
         df,
@@ -478,7 +511,7 @@ pest_methylation_clean <- list(
   list(dur_long_combine_metal, dur_long_combine_copper, dur_long_combine_op) %>% 
     map(function(df){
       df %>% 
-        filter(n_exp >= 30) %>%
+        filter(n_exp >= 25) %>%
         filter(chemcode %notin% c("chem1638", "chem164", "chem283",
                                   "chem353", "chem354")) %>%
         pull(chemcode) 
@@ -517,7 +550,7 @@ pest_methylation_clean <- list(
   
   
   list(
-    list(lb_sd_metal_wt_10, lb_sd_copper_wt_10, lb_sd_op_wt_10),
+    list(lb_sd_metal_wt, lb_sd_copper_wt, lb_sd_op_wt),
     list(metal_todrop, copper_todrop, op_todrop)
   ) %>% 
     pmap(function(df, chem){
@@ -554,9 +587,9 @@ pest_methylation_clean <- list(
             }) 
         }) 
     }) %>% 
-    set_names("lb_sd_metal_wt_10_processed", 
-              "lb_sd_copper_wt_10_processed",
-              "lb_sd_op_wt_10_processed") %>% 
+    set_names("lb_sd_metal_wt_processed", 
+              "lb_sd_copper_wt_processed",
+              "lb_sd_op_wt_processed") %>% 
     list2env(.GlobalEnv)
   
   # lb_sd_metal_wt_10_processed %>% 
@@ -570,8 +603,8 @@ pest_methylation_clean <- list(
   
   # further process with count data
   
-list(lb_sd_metal_wt_10_processed, lb_sd_copper_wt_10_processed, 
-     lb_sd_op_wt_10_processed) %>% 
+list(lb_sd_metal_wt_processed, lb_sd_copper_wt_processed, 
+     lb_sd_op_wt_processed) %>% 
     map(function(df){
       list(
         df[[4]],
@@ -596,9 +629,9 @@ list(lb_sd_metal_wt_10_processed, lb_sd_copper_wt_10_processed,
             })
         }) 
     }) %>% 
-    set_names("lb_sd_metal_wt_10_count", 
-              "lb_sd_copper_wt_10_count",
-              "lb_sd_op_wt_10_count") %>% 
+    set_names("lb_sd_metal_wt_count", 
+              "lb_sd_copper_wt_count",
+              "lb_sd_op_wt_count") %>% 
     list2env(.GlobalEnv)
   
 }
@@ -606,7 +639,7 @@ list(lb_sd_metal_wt_10_processed, lb_sd_copper_wt_10_processed,
 
 
 list(
-  c(lb_sd_metal_wt_10_count[[1]], lb_sd_metal_wt_10_count[[2]]),
+  c(lb_sd_metal_wt_count[[1]], lb_sd_metal_wt_count[[2]]),
   list(id_remove_c, id_remove_r, id_remove_c, id_remove_r)
 ) %>% 
   pmap(function(data1, data2){

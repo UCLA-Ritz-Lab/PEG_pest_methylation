@@ -115,7 +115,7 @@ list(
                       filter(sampleid %in% sampleid_pd) %>% 
                       pull(sampleid)
       )) %>%
-      apply(MARGIN = 1, dec_out) %>%
+      # apply(MARGIN = 1, dec_out) %>%
       t() %>%
       as.data.frame()
   }) %>% 

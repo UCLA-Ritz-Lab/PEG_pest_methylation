@@ -26,17 +26,20 @@ myvar <- quote_all(pegid, sampleid, age, pd_new,female,
 
 
 #using count data
-list(lb_sd_metal_wt_10_count, lb_sd_copper_wt_10_count, 
-     lb_sd_op_wt_10_count) %>% 
+list(lb_sd_metal_wt_count, lb_sd_copper_wt_count, 
+     lb_sd_op_wt_count) %>% 
   map(function(df){
     list(
       df[[1]], df[[2]]
     ) %>% 
       map(function(datalist){
-        datalist %>% 
-          map(function(data){
+        list(datalist, 
+             list(exp_yrs_lag_c, exp_yrs_lag_r)) %>%
+          pmap(function(data, exp_yrs){
             data %>% 
-              dplyr::select(pegid, count)
+              dplyr::select(pegid, count) %>% 
+              left_join(exp_yrs, by = "pegid")
+              # mutate(count = count/exp_yrs_lag_dr)
           }) %>% 
           purrr::reduce(full_join, by = "pegid") %>% 
           mutate_all(~replace(., is.na(.), 0)) %>% 
@@ -63,14 +66,83 @@ hist(count_combine_metal_total$total)
 skim(count_combine_metal_total$total)
 
 hist(count_combine_copper_total$total)
+count_combine_copper_total %>% 
+  ggplot(aes(x = total)) + 
+  geom_histogram(binwidth=1)
 skim(count_combine_copper_total$total)
 
 hist(count_combine_op_total$total)
+count_combine_op_total %>% 
+  ggplot(aes(x = total)) + 
+  geom_histogram(binwidth=1)
+
 skim(count_combine_op_total$total)
 
+#using duration data
+list(heavy_metal$chemcode, chem_copper$chemcode, chem_op$chemcode) %>% 
+  map(function(chemlist){
+    list(
+      list(exp_window_address_case, exp_window_address_control),
+      count_combine_copper
+    ) %>%
+      pmap(function(data1, data2){
+        data1 %>%
+          map(function(df){
+            df %>% 
+              group_by(pegid) %>%
+              filter(year <= indexyr) %>% 
+              filter(chemcode %in% chemlist) %>% 
+              ungroup() %>% 
+              replace_na(list(sum_total_lbs = 0))
+          }) %>% 
+          bind_rows() %>% 
+          group_by(pegid, year, chemcode) %>% 
+          summarise(sum_total_lbs = sum(sum_total_lbs),
+                    .groups = "keep") %>%
+          ungroup() %>% 
+          mutate(ind = if_else(sum_total_lbs > 0, 1, 0)) %>%
+          group_by(pegid, chemcode) %>%
+          summarise(duration = sum(ind),
+                    .groups = "keep") %>% 
+          ungroup() %>% 
+          right_join(data2, by = "pegid") %>% 
+          mutate_at(vars(duration), ~replace_na(., 0)) %>% 
+          group_by(pegid) %>% 
+          summarise(exp_duration = sum(duration),
+                    .groups = "keep") %>%
+          ungroup()
+      })
+  }) %>%
+  set_names("exp_duration_metal", "exp_duration_copper", "exp_duration_op") %>%
+  list2env(.GlobalEnv)
 
-c(lb_sd_metal_wt_10_count[[1]], 
-  lb_sd_metal_wt_10_count[[2]]) %>% 
+list(exp_duration_metal, exp_duration_copper, exp_duration_op) %>% 
+  map(function(data){
+    data %>% 
+      bind_rows()
+  }) %>% 
+  set_names("exp_duration_metal_total", "exp_duration_copper_total", 
+            "exp_duration_op_total") %>% 
+  list2env(.GlobalEnv)
+
+exp_duration_copper[[1]] %>%
+  select(pegid) %>% 
+  distinct() %>% 
+  nrow()
+  
+exp_duration_copper %>% 
+  ggplot(aes(x = exp_duration)) + 
+  geom_histogram()
+skim(exp_duration_copper$exp_duration)
+
+exp_duration_op %>% 
+  ggplot(aes(x = exp_duration)) + 
+  geom_histogram()
+skim(exp_duration_op$exp_duration)
+
+## create table 1
+c(lb_sd_metal_wt_count[[1]], 
+  lb_sd_metal_wt_count[[2]]) %>% 
   map(function(data){
     data %>% 
       dplyr::select(all_of(myvar))
@@ -186,14 +258,20 @@ list(metal_filter, copper_filter, op_filter) %>%
               mutate_at(vars(sum_total_lbs), extreme_remove_percentile_win) %>% 
               group_by(pegid,year) %>% 
               summarise(sum_total_lbs = sum(sum_total_lbs),.groups = "keep") %>% 
-              inner_join(pest_methylation_clean[[1]], by = "pegid") %>%
-              replace_na(list(sum_total_lbs = 0))
+              right_join(pest_methylation_clean_total, by = "pegid") %>%
+              replace_na(list(sum_total_lbs = 0)) %>% 
+              ungroup()
           })
       }) 
   }) %>% 
   set_names("outcheck_metal_specific", "outcheck_copper_specific",
             "outcheck_op_specific") %>% 
   list2env(.,envir = .GlobalEnv)
+
+outcheck_copper_specific[[1]][[2]] %>% 
+  select(pegid) %>% 
+  distinct() %>% 
+  nrow()
 
 list(outcheck_metal_specific, outcheck_copper_specific, 
      outcheck_op_specific) %>% 
@@ -211,16 +289,16 @@ list(outcheck_metal_specific, outcheck_copper_specific,
           }) %>% 
           rbindlist() %>% 
           filter(year <= 2008) %>% 
-          group_by(year, location) %>% 
+          group_by(year, pd_new) %>% 
           summarise(y=mean(sum_total_lbs, na.rm=T),.groups="keep") %>% 
           #change to average per person, including unexposed people
-          ggplot(aes(x=year, y=y, group=location, color = factor(location))) + 
+          ggplot(aes(x=year, y=y, group=pd_new, color = factor(pd_new))) + 
           annotate("rect", fill = "azure2", alpha = 0.5,
                    xmin = 1989, xmax = 2010,
                    ymin = -Inf, ymax = Inf) +
           labs(x = "Years",
                y = "Chemical use (lbs)",
-               color = "Location") +
+               color = "PD") +
           #geom_point()+
           geom_line(linewidth=1) +
           scale_color_colorblind() +
@@ -258,7 +336,7 @@ ggarrange(plotlist = plotlist_metal,
 dev.off()
 
 png(file=here::here("figures", "copper_usage.png"), 
-    width = 1920, height = 1080, res = 125)
+    width = 2600, height = 1600, res = 125)
 ggarrange(plotlist = plotlist_copper,
           labels = copper_filter_name$chemname,
           common.legend = T,
@@ -297,9 +375,9 @@ library(ChAMP)
 #   list2env(.GlobalEnv)
 
 
-dmp_count_case <- count_combine_copper[[1]] %>%
-  dplyr::select(total) %>%
-  map(~champ.DMP(beta = combined_resid_filter_pd_r, 
+dmp_count_case <- exp_duration_copper[[1]] %>%
+  dplyr::select(exp_duration) %>%
+  purrr::map(~champ.DMP(beta = combined_resid_filter_pd_r, 
                  pheno = .x,
                  compare.group = NULL,
                  adjPVal = 0.05, adjust.method = "BH",
@@ -323,24 +401,33 @@ DMP.GUI(DMP = dmp_count_case[[1]],
 #         cutgroupnumber = 2)
 
 #method 2: limma
-design <- model.matrix(~ total, data = count_combine_copper[[1]])
-fit <- lmFit(combined_resid_filter_pd_r, design)
+library(limma)
+case_count_combind <- count_combine_copper[[1]] %>% 
+  left_join(covar_case_process[[2]], by = "pegid") %>% 
+  left_join(count_combine_op[[1]], by = "pegid") %>% 
+  dplyr::select(-c(pegid, count)) %>% 
+  dplyr::rename(copper_count = total.x,
+                op_count = total.y)
+
+design <- model.matrix(~ ., data = case_count_combind)
+fit <- lmFit(PEG_NOOB_nors_win_filter_pd_r, design)
 fit2 <- eBayes(fit)
 sig_cpg_limma <- topTable(fit2, coef=ncol(design), sort.by="p",
-                          number = nrow(combined_resid_filter_pd_r), 
-                          adjust.method = "BY")
+                          number = nrow(PEG_NOOB_nors_win_filter_pd_r), 
+                          adjust.method = "BY") %>% 
+  filter(-log10(P.Value) > 6)
 
 par(mfrow=c(2,5))
 sapply(rownames(sig_cpg_limma)[1:10], function(cpg){
-  plotCpg(combined_resid_filter_pd_r, cpg=cpg, 
-          pheno=count_combine_copper[[1]]$total, 
+  plotCpg(PEG_NOOB_nors_win_filter_pd_r, cpg=cpg, 
+          pheno=case_count_combind$copper_count, 
           ylab = "Beta values")
 })
 dev.off()
 
 dat <- data.frame(foldchange = fit[["coefficients"]][,2], 
                   logPvalue =  -log10(fit2[["p.value"]][,2]))
-dat$threshold <- as.factor(abs(dat$foldchange) < 0.0005)
+dat$threshold <- as.factor(abs(dat$foldchange) < 0.05)
 
 #Visualization
 cols <- c("TRUE" = "grey", "FALSE" = "blue")
@@ -370,7 +457,7 @@ myvars_ewas <- quote_all(cd8t, cd4t, nk, mono, bcell, gran,
 
 
 #select covariates
-list(lb_sd_copper_wt_10_count, lb_sd_op_wt_10_count) %>%
+list(lb_sd_copper_wt_count, lb_sd_op_wt_count) %>%
   pmap(function(df1, df2){
     list(df1, df2) %>%
       pmap(function(data1, data2){
@@ -441,7 +528,7 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
                         isva = F, sva = F, smartsva = F, n.sv = NULL, 
                         winsorize.pct = NA, robust = TRUE,
                         rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
-                        random.seed = 20230922, lmfit.safer = F, verbose = T))
+                        random.seed = 20240812, lmfit.safer = F, verbose = T))
   }) %>% 
   set_names("meffil_count_noop_case", "meffil_count_noop_ctrl", 
             "meffil_count_noop_total",
@@ -463,6 +550,50 @@ save(meffil_count_op_total, file = "meffil_count_op_total.RData")
 save(meffil_count_noop_case, file = "meffil_count_noop_case.RData")
 save(meffil_count_noop_ctrl, file = "meffil_count_noop_ctrl.RData")
 save(meffil_count_noop_total, file = "meffil_count_noop_total.RData")
+
+list(list(exp_duration_copper[[1]], exp_duration_copper[[2]], 
+          exp_duration_copper_total, 
+          exp_duration_copper[[1]], exp_duration_copper[[2]], 
+          exp_duration_copper_total),
+     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+          peg_noob_nors_win_total,
+          PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+          peg_noob_nors_win_total),
+     list(covar_case_combind %>% dplyr::select(-count), 
+          covar_ctrl_combind %>% dplyr::select(-count), 
+          covar_total %>% dplyr::select(-count),
+          covar_case_combind, covar_ctrl_combind, covar_total)) %>% 
+  pmap(function(data1,data2,data3){
+    data1 %>% 
+      dplyr::select(exp_duration) %>% 
+      map(~meffil.ewas( beta=as.matrix(data2), 
+                        variable=.x, 
+                        covariates = data3, 
+                        batch = NULL, weights = NULL,  cell.counts = NULL,
+                        isva = F, sva = F, smartsva = F, n.sv = NULL, 
+                        winsorize.pct = NA, robust = TRUE,
+                        rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
+                        random.seed = 20240812, lmfit.safer = F, verbose = T))
+  }) %>% 
+  set_names("meffil_duration_noop_case", "meffil_duration_noop_ctrl", 
+            "meffil_duration_noop_total",
+            "meffil_duration_op_case", "meffil_duration_op_ctrl", 
+            "meffil_duration_op_total") %>% 
+  list2env(.,envir = .GlobalEnv)
+
+test <- meffil_duration_noop_ctrl$exp_duration$analyses$all$table %>% 
+  filter(-log10(p.value) > 6) %>% 
+  rownames_to_column("cpg") %>%
+  arrange(p.value)
+
+
+save(meffil_duration_op_case, file = "meffil_duration_op_case.RData")
+save(meffil_duration_op_ctrl, file = "meffil_duration_op_ctrl.RData")
+save(meffil_duration_op_total, file = "meffil_duration_op_total.RData")
+
+save(meffil_duration_noop_case, file = "meffil_duration_noop_case.RData")
+save(meffil_duration_noop_ctrl, file = "meffil_duration_noop_ctrl.RData")
+save(meffil_duration_noop_total, file = "meffil_duration_noop_total.RData")
 
 
 list(list(meffil_count_op_case, 
@@ -511,6 +642,8 @@ list(list(ewas.summary_count_op_case,
 # DMR analysis ------------------------------------------------------------
 
 # method 1: ipdmr
+
+library(ENmix)
 test <- meffil_count_op_case$total$analyses$all$table %>% 
   # filter(-log10(p.value) > 3) %>%
   dplyr::select(chromosome, position, p.value) %>% 
@@ -526,27 +659,42 @@ ipdmr(data=test, include.all.sig.sites=TRUE,dist.cutoff=1000,bin.size=50,
       seed=0.0001,region_plot=TRUE,mht_plot=FALSE,verbose=TRUE)
 combp(data = test, bin.size=50, nCores = 1)
 
-
+combp
 #method 2: DMRcate
 library(DMRcate)
 # ?cpg.annotate()
 # # Setting some annotation
-myAnnotation <- cpg.annotate(object = as.matrix(combined_resid_filter_pd_r), 
+myAnnotation <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_win_filter_pd_r), 
                              datatype = "array",
                              what = "Beta",
                              analysis.type = "differential",
                              design = design,
                              contrasts = FALSE,
-                             coef = "copper",
+                             coef = 2,
                              arraytype = "450K",
                              fdr = 0.05)
 str(myAnnotation)
 # 
 # # DMR analysis
 DMRs <- dmrcate(myAnnotation, lambda=1000, C=2)
+
+save(DMRs, file = "DMRs.RData")
+?dmrcate()
+?extractRanges()
 results.ranges <- extractRanges(DMRs)
 results.ranges
 
+test <- results.ranges %>% 
+  as.data.frame()
+
+# cols <- c(2,4)[count_combine_copper[[1]]$total]
+# names(cols) <-group
+# 
+# par(mfrow=c(1,1))
+# DMR.plot(ranges=results.ranges, dmr=1, 
+#          CpGs=as.matrix(PEG_NOOB_nors_win_filter_pd_r), 
+#          phen.col=as.numeric(count_combine_copper[[1]]$total),
+#          what="Beta", arraytype="450K", genome="hg19")
 
 # using the count dataset
 dmr_champ_copper <- count_combine_copper[[1]] %>% 
@@ -571,7 +719,7 @@ DMR.GUI(DMR  = dmr_champ_copper[[1]],
         pheno = count_combine_copper[[1]]$total)
 
 # using the quartile pesticide dataset
-dmr_champ_chem155_quartile_c <- c_lb_sd_case_wt_10_quantile %>% 
+dmr_champ_chem155_quartile_c <- c_lb_sd_case_wt_quantile %>% 
   select(chem155) %>% 
   map(~champ.DMR(beta = as.matrix(combined_resid_filter_pd_c), 
                  pheno = .x, compare.group = NULL, 
@@ -588,7 +736,7 @@ dmr_champ_chem155_quartile_c <- c_lb_sd_case_wt_10_quantile %>%
 
 
 # using the evernever pesticide dataset
-dmr_champ_chem155_evernever_c <- c_lb_sd_case_wt_10_evernever %>% 
+dmr_champ_chem155_evernever_c <- c_lb_sd_case_wt_evernever %>% 
   select(chem155) %>% 
   map(~champ.DMR(beta = as.matrix(combined_resid_filter_pd_c), 
                  pheno = .x, compare.group = NULL, 
@@ -621,11 +769,13 @@ save(dmr_highlow_c, file = "dmr_highlow_c.RData")
 
 DMR.GUI(DMR  = dmr_evernever_c[[3]], 
         beta = as.matrix(combined_resid_filter_pd_c), 
-        pheno = c_lb_sd_case_wt_10_evernever$chem714)
+        pheno = c_lb_sd_case_wt_evernever$chem714)
 
 
 
 # GESA analysis -----------------------------------------------------------
+
+### method 1: ChAMP package
 gsea_champ_copper <- champ.GSEA(beta = as.matrix(combined_resid_filter_pd_r),
                                 DMP = dmp_count_case[[1]],
                                 DMR = dmr_champ_copper[[1]],
@@ -644,6 +794,30 @@ test <- gsea_champ_copper$DMP %>%
   rownames_to_column("GO_term")
 
 write_csv(test, here::here("tables", "gsea_champ_copper_3000.csv"))
+
+
+### method 2: missMethyl package
+
+library(missMethyl)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+
+topCpGs <- meffil_count_op_case$total$analyses$all$table %>% 
+  filter(-log10(p.value) > 4) %>% 
+  rownames_to_column("cpg") %>%
+  arrange(p.value)
+
+sigCpGs <- topCpGs %>% 
+  pull(cpg)
+
+gst_go <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(peg_noob_nors_win_total), collection="GO",
+                   plot.bias=TRUE)
+
+topGSA(gst_go, n=10)
+
+gst_kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(peg_noob_nors_win_total), collection="KEGG",
+              plot.bias=TRUE)
+
+topGSA(gst_kegg, n=10)
 
 # ebgsea_champ_copper <- champ.ebGSEA(beta = as.matrix(combined_resid_filter_pd_r),
 #                                     pheno = count_combine_copper[[1]]$total,

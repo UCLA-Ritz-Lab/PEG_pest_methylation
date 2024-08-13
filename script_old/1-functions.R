@@ -138,10 +138,11 @@ extreme_remove_percentile <- function(x) {
 
 ## 3. use percentile/thousands: winsorization
 extreme_remove_percentile_win <- function(x) {
-  Q = quantile(x, c(0.1, 0.90), na.rm = TRUE)
-  x = case_when(x < Q[1] ~ Q[1],
-                x > Q[2] ~ Q[2],
-                TRUE ~ x)
+  Q = quantile(x, c(0.01, 0.99), na.rm = TRUE)
+  x = case_when(
+    # x < Q[1] ~ Q[1],
+    x > Q[2] ~ Q[2],
+    TRUE ~ x)
 }
 
 # an equivalent as the third function
