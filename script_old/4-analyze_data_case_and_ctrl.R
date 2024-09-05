@@ -541,7 +541,7 @@ test <- meffil_count_op_case$total$analyses$all$table %>%
   filter(-log10(p.value) > 6) %>% 
   rownames_to_column("cpg") %>%
   arrange(p.value)
-
+# write_csv(test, "copper_op_count_sig.csv")
 
 save(meffil_count_op_case, file = "meffil_count_op_case.RData")
 save(meffil_count_op_ctrl, file = "meffil_count_op_ctrl.RData")
