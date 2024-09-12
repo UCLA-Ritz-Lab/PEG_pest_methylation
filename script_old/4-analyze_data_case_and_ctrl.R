@@ -130,7 +130,7 @@ exp_duration_copper[[1]] %>%
   distinct() %>% 
   nrow()
   
-exp_duration_copper %>% 
+exp_duration_copper_total %>% 
   ggplot(aes(x = exp_duration)) + 
   geom_histogram()
 skim(exp_duration_copper$exp_duration)
@@ -175,7 +175,7 @@ c(lb_sd_metal_wt_count[[1]],
               statistic = list(all_continuous() ~ "{mean} ({sd})",
                                all_categorical() ~ "{n} ({p}%)"),
               digits = list(all_continuous() ~ 1,
-                            all_categorical() ~ 1)) %>%
+                            all_categorical() ~ 0)) %>%
   add_overall() %>% 
   modify_header(label = "**Characteristics**") %>%
   # modify_spanning_header(starts_with("stat_") ~ "**PD status**") %>%
@@ -328,7 +328,7 @@ list(
   })
 
 png(file=here::here("figures", "metal_usage.png"), 
-    width = 1920, height = 1080, res = 125)
+    width = 2600, height = 1600, res = 125)
 ggarrange(plotlist = plotlist_metal,
           labels = metal_filter_name$chemname,
           common.legend = T,
@@ -344,7 +344,7 @@ ggarrange(plotlist = plotlist_copper,
 dev.off()
 
 png(file=here::here("figures", "op_usage.png"), 
-    width = 1920, height = 1080, res = 125)
+    width = 2600, height = 1600, res = 125)
 ggarrange(plotlist = plotlist_op,
           labels = op_filter_name$chemname,
           common.legend = T,
@@ -375,14 +375,15 @@ library(ChAMP)
 #   list2env(.GlobalEnv)
 
 
-dmp_count_case <- exp_duration_copper[[1]] %>%
-  dplyr::select(exp_duration) %>%
+dmp_count_case <- count_combine_copper[[1]] %>%
+  dplyr::select(total) %>%
   purrr::map(~champ.DMP(beta = combined_resid_filter_pd_r, 
                  pheno = .x,
                  compare.group = NULL,
                  adjPVal = 0.05, adjust.method = "BH",
                  arraytype = "450K")[[1]])
-test <- dmp_count_case$total
+test <- dmp_count_case$total %>% 
+  filter(-log10(P.Value) > 6)
 # dmp_count_total <- count_combine_copper_total %>%
 #   dplyr::select(total) %>%
 #   map(~champ.DMP(beta = combined_resid_total, 
