@@ -377,12 +377,29 @@ library(ChAMP)
 
 dmp_count_case <- count_combine_copper[[1]] %>%
   dplyr::select(total) %>%
-  purrr::map(~champ.DMP(beta = combined_resid_filter_pd_r, 
+  purrr::map(~champ.DMP(beta = combined_resid_case, 
                  pheno = .x,
                  compare.group = NULL,
                  adjPVal = 0.05, adjust.method = "BH",
                  arraytype = "450K")[[1]])
-test <- dmp_count_case$total %>% 
+
+dmp_count_ctrl <- count_combine_copper[[2]] %>%
+  dplyr::select(total) %>%
+  purrr::map(~champ.DMP(beta = combined_resid_ctrl, 
+                        pheno = .x,
+                        compare.group = NULL,
+                        adjPVal = 0.05, adjust.method = "BH",
+                        arraytype = "450K")[[1]])
+
+dmp_count_total <- count_combine_copper_total %>%
+  dplyr::select(total) %>%
+  purrr::map(~champ.DMP(beta = combined_resid_total, 
+                        pheno = .x,
+                        compare.group = NULL,
+                        adjPVal = 0.05, adjust.method = "BH",
+                        arraytype = "450K")[[1]])
+
+test <- dmp_count_total$total %>% 
   filter(-log10(P.Value) > 6)
 # dmp_count_total <- count_combine_copper_total %>%
 #   dplyr::select(total) %>%
@@ -446,8 +463,8 @@ ggplot(data=dat, aes(x=foldchange, y = logPvalue, color=threshold)) +
 
 #Method 3: meffil
 # Load meffil and set how many cores to use for parallelization
-source(here("scripts", "meffil_fixed.R"))
-source(here("scripts", "meffil_report_fixed.R"))
+source(here::here("scripts", "meffil_fixed.R"))
+source(here::here("scripts", "meffil_report_fixed.R"))
 library(meffil)
 myvars_ewas <- quote_all(cd8t, cd4t, nk, mono, bcell, gran, 
                          age, female, smokers, rfvotecaucasian2, study)
@@ -511,10 +528,10 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
           count_combine_copper_total, 
           count_combine_copper[[1]], count_combine_copper[[2]], 
           count_combine_copper_total),
-     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total,
-          PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total),
+     list(PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
+          peg_noob_nors_filter_total,
+          PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
+          peg_noob_nors_filter_total),
      list(covar_case_combind %>% dplyr::select(-count), 
           covar_ctrl_combind %>% dplyr::select(-count), 
           covar_total %>% dplyr::select(-count),
@@ -538,7 +555,7 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
   list2env(.,envir = .GlobalEnv)
 
 
-test <- meffil_count_op_case$total$analyses$all$table %>% 
+test <- meffil_count_op_total$total$analyses$all$table %>% 
   filter(-log10(p.value) > 6) %>% 
   rownames_to_column("cpg") %>%
   arrange(p.value)
@@ -552,62 +569,60 @@ save(meffil_count_noop_case, file = "meffil_count_noop_case.RData")
 save(meffil_count_noop_ctrl, file = "meffil_count_noop_ctrl.RData")
 save(meffil_count_noop_total, file = "meffil_count_noop_total.RData")
 
-list(list(exp_duration_copper[[1]], exp_duration_copper[[2]], 
-          exp_duration_copper_total, 
-          exp_duration_copper[[1]], exp_duration_copper[[2]], 
-          exp_duration_copper_total),
-     list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total,
-          PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total),
-     list(covar_case_combind %>% dplyr::select(-count), 
-          covar_ctrl_combind %>% dplyr::select(-count), 
-          covar_total %>% dplyr::select(-count),
-          covar_case_combind, covar_ctrl_combind, covar_total)) %>% 
-  pmap(function(data1,data2,data3){
-    data1 %>% 
-      dplyr::select(exp_duration) %>% 
-      map(~meffil.ewas( beta=as.matrix(data2), 
-                        variable=.x, 
-                        covariates = data3, 
-                        batch = NULL, weights = NULL,  cell.counts = NULL,
-                        isva = F, sva = F, smartsva = F, n.sv = NULL, 
-                        winsorize.pct = NA, robust = TRUE,
-                        rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
-                        random.seed = 20240812, lmfit.safer = F, verbose = T))
-  }) %>% 
-  set_names("meffil_duration_noop_case", "meffil_duration_noop_ctrl", 
-            "meffil_duration_noop_total",
-            "meffil_duration_op_case", "meffil_duration_op_ctrl", 
-            "meffil_duration_op_total") %>% 
-  list2env(.,envir = .GlobalEnv)
-
-test <- meffil_duration_noop_ctrl$exp_duration$analyses$all$table %>% 
-  filter(-log10(p.value) > 6) %>% 
-  rownames_to_column("cpg") %>%
-  arrange(p.value)
-
-
-save(meffil_duration_op_case, file = "meffil_duration_op_case.RData")
-save(meffil_duration_op_ctrl, file = "meffil_duration_op_ctrl.RData")
-save(meffil_duration_op_total, file = "meffil_duration_op_total.RData")
-
-save(meffil_duration_noop_case, file = "meffil_duration_noop_case.RData")
-save(meffil_duration_noop_ctrl, file = "meffil_duration_noop_ctrl.RData")
-save(meffil_duration_noop_total, file = "meffil_duration_noop_total.RData")
+# list(list(exp_duration_copper[[1]], exp_duration_copper[[2]], 
+#           exp_duration_copper_total, 
+#           exp_duration_copper[[1]], exp_duration_copper[[2]], 
+#           exp_duration_copper_total),
+#      list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+#           peg_noob_nors_win_total,
+#           PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
+#           peg_noob_nors_win_total),
+#      list(covar_case_combind %>% dplyr::select(-count), 
+#           covar_ctrl_combind %>% dplyr::select(-count), 
+#           covar_total %>% dplyr::select(-count),
+#           covar_case_combind, covar_ctrl_combind, covar_total)) %>% 
+#   pmap(function(data1,data2,data3){
+#     data1 %>% 
+#       dplyr::select(exp_duration) %>% 
+#       map(~meffil.ewas( beta=as.matrix(data2), 
+#                         variable=.x, 
+#                         covariates = data3, 
+#                         batch = NULL, weights = NULL,  cell.counts = NULL,
+#                         isva = F, sva = F, smartsva = F, n.sv = NULL, 
+#                         winsorize.pct = NA, robust = TRUE,
+#                         rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
+#                         random.seed = 20240812, lmfit.safer = F, verbose = T))
+#   }) %>% 
+#   set_names("meffil_duration_noop_case", "meffil_duration_noop_ctrl", 
+#             "meffil_duration_noop_total",
+#             "meffil_duration_op_case", "meffil_duration_op_ctrl", 
+#             "meffil_duration_op_total") %>% 
+#   list2env(.,envir = .GlobalEnv)
+# 
+# test <- meffil_duration_noop_ctrl$exp_duration$analyses$all$table %>% 
+#   filter(-log10(p.value) > 6) %>% 
+#   rownames_to_column("cpg") %>%
+#   arrange(p.value)
+# 
+# 
+# save(meffil_duration_op_case, file = "meffil_duration_op_case.RData")
+# save(meffil_duration_op_ctrl, file = "meffil_duration_op_ctrl.RData")
+# save(meffil_duration_op_total, file = "meffil_duration_op_total.RData")
+# 
+# save(meffil_duration_noop_case, file = "meffil_duration_noop_case.RData")
+# save(meffil_duration_noop_ctrl, file = "meffil_duration_noop_ctrl.RData")
+# save(meffil_duration_noop_total, file = "meffil_duration_noop_total.RData")
 
 
 list(list(meffil_count_op_case, 
           meffil_count_op_ctrl, meffil_count_op_total,
           meffil_count_noop_case, 
           meffil_count_noop_ctrl, meffil_count_noop_total),
-     list(PEG_NOOB_nors_win_filter_pd_r, 
-          PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total,
-          PEG_NOOB_nors_win_filter_pd_r, 
-          PEG_NOOB_nors_win_filter_ctrl_r, 
-          peg_noob_nors_win_total)) %>% 
-  pmap(function(meffil_list,data){
+     list(PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
+          peg_noob_nors_filter_total,
+          PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
+          peg_noob_nors_filter_total)) %>% 
+  pmap(function(meffil_list, data){
     meffil_list %>% 
       map(~ meffil.ewas.summary_fix(.x,data,
                                     parameters = ewas.parameters))
@@ -663,30 +678,72 @@ combp(data = test, bin.size=50, nCores = 1)
 combp
 #method 2: DMRcate
 library(DMRcate)
+
+case_count_combined <- count_combine_copper[[1]] %>% 
+  left_join(covar_case_process[[2]], by = "pegid") %>% 
+  left_join(count_combine_op[[1]], by = "pegid") %>% 
+  dplyr::select(-c(pegid, count)) %>% 
+  dplyr::rename(copper_count = total.x,
+                op_count = total.y)
+
+ctrl_count_combined <- count_combine_copper[[2]] %>% 
+  left_join(covar_ctrl_process[[2]], by = "pegid") %>% 
+  left_join(count_combine_op[[2]], by = "pegid") %>% 
+  dplyr::select(-c(pegid, count, study)) %>% 
+  dplyr::rename(copper_count = total.x,
+                op_count = total.y)
+
+total_count_combined <- list(case_count_combined, ctrl_count_combined) %>% 
+  bind_rows()
+
+design_case <- model.matrix(~ ., data = case_count_combined)
+design_ctrl <- model.matrix(~ ., data = ctrl_count_combined)
+design_total <- model.matrix(~ ., data = total_count_combined)
 # ?cpg.annotate()
 # # Setting some annotation
-myAnnotation <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_win_filter_pd_r), 
+myAnnotation_case <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_case), 
                              datatype = "array",
                              what = "Beta",
                              analysis.type = "differential",
-                             design = design,
+                             design = design_case,
                              contrasts = FALSE,
                              coef = 2,
                              arraytype = "450K",
                              fdr = 0.05)
-str(myAnnotation)
+
+myAnnotation_ctrl <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_ctrl), 
+                                  datatype = "array",
+                                  what = "Beta",
+                                  analysis.type = "differential",
+                                  design = design_ctrl,
+                                  contrasts = FALSE,
+                                  coef = 2,
+                                  arraytype = "450K",
+                                  fdr = 0.05)
+
+myAnnotation_total <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_total), 
+                                  datatype = "array",
+                                  what = "Beta",
+                                  analysis.type = "differential",
+                                  design = design_total,
+                                  contrasts = FALSE,
+                                  coef = 2,
+                                  arraytype = "450K",
+                                  fdr = 0.05)
+str(myAnnotation_case)
 # 
 # # DMR analysis
-DMRs <- dmrcate(myAnnotation, lambda=1000, C=2)
+DMRs_case <- dmrcate(myAnnotation_case, lambda=1000, C=2)
 
-save(DMRs, file = "DMRs.RData")
+save(DMRs_case, file = "DMRs_case.RData")
 ?dmrcate()
 ?extractRanges()
-results.ranges <- extractRanges(DMRs)
-results.ranges
+results.ranges_case <- extractRanges(DMRs_case)
+results.ranges_case
 
-test <- results.ranges %>% 
-  as.data.frame()
+test <- results.ranges_case %>% 
+  as.data.frame() %>% 
+  filter(no.cpgs >=5)
 
 # cols <- c(2,4)[count_combine_copper[[1]]$total]
 # names(cols) <-group
@@ -697,101 +754,105 @@ test <- results.ranges %>%
 #          phen.col=as.numeric(count_combine_copper[[1]]$total),
 #          what="Beta", arraytype="450K", genome="hg19")
 
-# using the count dataset
-dmr_champ_copper <- count_combine_copper[[1]] %>% 
-  dplyr::select(total) %>% 
-  map(~champ.DMR(beta = as.matrix(combined_resid_filter_pd_r), 
-                 pheno = .x, compare.group = NULL, 
-                 arraytype = "450K", method = "Bumphunter", minProbes = 5, 
-                 adjPvalDmr = 0.05, cores = 8, maxGap = 300, cutoff = NULL, 
-                 pickCutoff = TRUE, smooth = TRUE, 
-                 smoothFunction = loessByCluster, useWeights = FALSE, 
-                 permutations = NULL, B = 250, nullMethod = "bootstrap", 
-                 meanLassoRadius = 375, minDmrSep = 1000, minDmrSize = 50, 
-                 adjPvalProbe = 0.05, Rplot = T, PDFplot = T, 
-                 resultsDir = here("dmr"), 
-                 rmSNPCH = T, fdr = 0.05, dist = 2, 
-                 mafcut = 0.05, lambda = 1000, C = 2))
+# method3: champ package
+list(
+  list(count_combine_copper[[1]], count_combine_copper[[2]], 
+       count_combine_copper_total),
+  list(combined_resid_case, combined_resid_ctrl, combined_resid_total)
+) %>% 
+  pmap(function(data1, data2){
+    data1 %>% 
+      dplyr::select(total) %>% 
+      map(~champ.DMR(beta = as.matrix(data2), 
+                     pheno = .x, compare.group = NULL, 
+                     arraytype = "450K", method = "Bumphunter", minProbes = 5, 
+                     adjPvalDmr = 0.05, cores = 10, maxGap = 300, cutoff = NULL, 
+                     pickCutoff = TRUE, smooth = TRUE, 
+                     smoothFunction = loessByCluster, useWeights = FALSE, 
+                     permutations = NULL, B = 250, nullMethod = "bootstrap", 
+                     meanLassoRadius = 375, minDmrSep = 1000, minDmrSize = 50, 
+                     adjPvalProbe = 0.05, Rplot = T, PDFplot = T, 
+                     resultsDir = here("dmr"), 
+                     rmSNPCH = T, fdr = 0.05, dist = 2, 
+                     mafcut = 0.05, lambda = 1000, C = 2))
+  }) %>%
+  set_names("dmr_champ_copper_case", "dmr_champ_copper_ctrl", 
+            "dmr_champ_copper_total") %>%
+  list2env(.,envir = .GlobalEnv)
 
-save(dmr_champ_copper, file = "dmr_champ_copper.RData")
 
-DMR.GUI(DMR  = dmr_champ_copper[[1]], 
-        beta = as.matrix(combined_resid_filter_pd_r), 
+save(dmr_champ_copper_case, file = "dmr_champ_copper_case.RData")
+save(dmr_champ_copper_ctrl, file = "dmr_champ_copper_ctrl.RData")
+save(dmr_champ_copper_total, file = "dmr_champ_copper_total.RData")
+
+DMR.GUI(DMR  = dmr_champ_copper_case[[1]], 
+        beta = as.matrix(combined_resid_case), 
         pheno = count_combine_copper[[1]]$total)
 
-# using the quartile pesticide dataset
-dmr_champ_chem155_quartile_c <- c_lb_sd_case_wt_quantile %>% 
-  select(chem155) %>% 
-  map(~champ.DMR(beta = as.matrix(combined_resid_filter_pd_c), 
-                 pheno = .x, compare.group = NULL, 
-                 arraytype = "450K", method = "Bumphunter", minProbes = 0, 
-                 adjPvalDmr = 0.05, cores = 5, maxGap = 300, cutoff = NULL, 
-                 pickCutoff = TRUE, smooth = TRUE, 
-                 smoothFunction = loessByCluster, useWeights = FALSE, 
-                 permutations = NULL, B = 250, nullMethod = "bootstrap", 
-                 meanLassoRadius = 375, minDmrSep = 1000, minDmrSize = 50, 
-                 adjPvalProbe = 0.05, Rplot = T, PDFplot = T, 
-                 resultsDir = here("dmr"), 
-                 rmSNPCH = T, fdr = 0.05, dist = 2, 
-                 mafcut = 0.05, lambda = 1000, C = 2))
-
-
-# using the evernever pesticide dataset
-dmr_champ_chem155_evernever_c <- c_lb_sd_case_wt_evernever %>% 
-  select(chem155) %>% 
-  map(~champ.DMR(beta = as.matrix(combined_resid_filter_pd_c), 
-                 pheno = .x, compare.group = NULL, 
-                 arraytype = "450K", method = "Bumphunter", minProbes = 0, 
-                 adjPvalDmr = 0.05, cores = 5, maxGap = 300, cutoff = NULL, 
-                 pickCutoff = TRUE, smooth = TRUE, 
-                 smoothFunction = loessByCluster, useWeights = FALSE, 
-                 permutations = NULL, B = 250, nullMethod = "bootstrap", 
-                 meanLassoRadius = 375, minDmrSep = 1000, minDmrSize = 50, 
-                 adjPvalProbe = 0.05, Rplot = T, PDFplot = T, 
-                 resultsDir = here("dmr"), 
-                 rmSNPCH = T, fdr = 0.05, dist = 2, 
-                 mafcut = 0.05, lambda = 1000, C = 2))
-
-  
-save(dmr_champ_chem155_evernever_c, file = "dmr_champ_chem155_evernever_c.RData")
-save(dmr_champ_chem283_evernever_c, file = "dmr_champ_chem283_evernever_c.RData")
-save(dmr_champ_chem714_evernever_c, file = "dmr_champ_chem714_evernever_c.RData")
-
-dmr_evernever_c <- list(chem155 = dmr_champ_chem155_evernever_c[[1]], 
-                        chem283 = dmr_champ_chem283_evernever_c[[1]], 
-                        chem714 = dmr_champ_chem714_evernever_c[[1]])
-
-dmr_highlow_c <- list(chem155 = dmr_champ_chem155_c[[1]], 
-                      chem283 = dmr_champ_chem283_c[1], 
-                      chem714 = dmr_champ_chem714_c[[1]])
-
-save(dmr_evernever_c, file = "dmr_evernever_c.RData")
-save(dmr_highlow_c, file = "dmr_highlow_c.RData")
-
-DMR.GUI(DMR  = dmr_evernever_c[[3]], 
-        beta = as.matrix(combined_resid_filter_pd_c), 
-        pheno = c_lb_sd_case_wt_evernever$chem714)
+test <- dmr_champ_copper_total$total$BumphunterDMR
 
 
 
 # GESA analysis -----------------------------------------------------------
 
-### method 1: ChAMP package
-gsea_champ_copper <- champ.GSEA(beta = as.matrix(combined_resid_filter_pd_r),
-                                DMP = dmp_count_case[[1]],
-                                DMR = dmr_champ_copper[[1]],
-                                CpGlist=NULL,
-                                Genelist=NULL,
-                                pheno=count_combine_copper[[1]]$total,
-                                method="gometh",
-                                arraytype="450K",
-                                Rplot=TRUE,
-                                adjPval=0.05,
-                                cores=8)
-?champ.GSEA()
-save(gsea_champ_copper, file = "gsea_champ_copper.RData")
+### method 1: ChAMP package (gometh)
 
-test <- gsea_champ_copper$DMP %>% 
+list(
+  list(combined_resid_case, combined_resid_total),
+  list(dmp_count_case, dmp_count_total),
+  list(dmr_champ_copper_case, dmr_champ_copper_total),
+  list(count_combine_copper[[1]],  
+       count_combine_copper_total)
+) %>% 
+  pmap(function(data1, data2, data3, data4){
+      champ.GSEA(beta = as.matrix(data1),
+                  DMP = data2[[1]],
+                  DMR = data3[[1]],
+                  CpGlist=NULL,
+                  Genelist=NULL,
+                  pheno=data4$total,
+                  method="gometh",
+                  arraytype="450K",
+                  Rplot=TRUE,
+                  adjPval=0.05,
+                  cores = 10)
+  }) %>%
+  set_names("gsea_champ_copper_case", "gsea_champ_copper_total") %>%
+  list2env(.,envir = .GlobalEnv)
+
+
+save(gsea_champ_copper_case, file = "gsea_champ_copper_case.RData")
+save(gsea_champ_copper_total, file = "gsea_champ_copper_total.RData")
+
+### method 2: ChAMP package (empirical bayes)
+list(
+  list(combined_resid_case, combined_resid_ctrl, combined_resid_total),
+  list(count_combine_copper[[1]],
+       count_combine_copper[[2]],
+       count_combine_copper_total)
+) %>% 
+  pmap(function(data1, data2){
+    champ.GSEA(beta = as.matrix(data1),
+               DMP = NULL,
+               DMR = NULL,
+               CpGlist = NULL,
+               Genelist = NULL,
+               pheno=data2$total,
+               method="ebayes",
+               arraytype="450K",
+               Rplot=TRUE,
+               adjPval=0.05,
+               cores = 10)
+  }) %>%
+  set_names("gsea_champ_copper_ebayes_case", "gsea_champ_copper_ebayes_ctrl",
+            "gsea_champ_copper_ebayes_total") %>%
+  list2env(.,envir = .GlobalEnv)
+
+save(gsea_champ_copper_ebayes_case, file = "gsea_champ_copper_ebayes_case.RData")
+save(gsea_champ_copper_ebayes_ctrl, file = "gsea_champ_copper_ebayes_ctrl.RData")
+save(gsea_champ_copper_ebayes_total, file = "gsea_champ_copper_ebayes_total.RData")
+
+test <- gsea_champ_copper_case$DMP %>% 
   rownames_to_column("GO_term")
 
 write_csv(test, here::here("tables", "gsea_champ_copper_3000.csv"))

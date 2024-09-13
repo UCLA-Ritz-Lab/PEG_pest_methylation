@@ -72,20 +72,12 @@
     # }
 
   
-  # load residuals
+  # load residuals and filtered beta-matrix
   list.dirs(here(),recursive = FALSE) %>%
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-    grep("filter_",.,
+    grep("resid_case|resid_ctrl|nors_filter",.,
          value=TRUE, ignore.case = TRUE) %>%
-    keep(~!str_detect(.x,"win|dmplist|old|more|90|0.1|archive")) %>%
-    map(.,load,.GlobalEnv)
-  
-  # load filtered beta-matrix
-  list.dirs(here::here(),recursive = FALSE) %>%
-    list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-    base::grep("noob",., 
-         value=TRUE, ignore.case = TRUE) %>%
-    discard(~str_detect(.x,"raw|old|new|archive|nors_filter")) %>%
+    # keep(~!str_detect(.x,"win|dmplist|old|more|90|0.1|archive")) %>%
     map(.,load,.GlobalEnv)
   
   
