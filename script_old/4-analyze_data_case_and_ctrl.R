@@ -555,10 +555,15 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
   list2env(.,envir = .GlobalEnv)
 
 
-test <- meffil_count_op_total$total$analyses$all$table %>% 
+test_meffil <- meffil_count_op_case$total$analyses$all$table %>% 
   filter(-log10(p.value) > 6) %>% 
   rownames_to_column("cpg") %>%
   arrange(p.value)
+
+test_champ <- dmp_count_case$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
+  rownames_to_column("cpg") %>%
+  arrange(P.Value)
 # write_csv(test, "copper_op_count_sig.csv")
 
 save(meffil_count_op_case, file = "meffil_count_op_case.RData")
@@ -568,50 +573,6 @@ save(meffil_count_op_total, file = "meffil_count_op_total.RData")
 save(meffil_count_noop_case, file = "meffil_count_noop_case.RData")
 save(meffil_count_noop_ctrl, file = "meffil_count_noop_ctrl.RData")
 save(meffil_count_noop_total, file = "meffil_count_noop_total.RData")
-
-# list(list(exp_duration_copper[[1]], exp_duration_copper[[2]], 
-#           exp_duration_copper_total, 
-#           exp_duration_copper[[1]], exp_duration_copper[[2]], 
-#           exp_duration_copper_total),
-#      list(PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-#           peg_noob_nors_win_total,
-#           PEG_NOOB_nors_win_filter_pd_r, PEG_NOOB_nors_win_filter_ctrl_r, 
-#           peg_noob_nors_win_total),
-#      list(covar_case_combind %>% dplyr::select(-count), 
-#           covar_ctrl_combind %>% dplyr::select(-count), 
-#           covar_total %>% dplyr::select(-count),
-#           covar_case_combind, covar_ctrl_combind, covar_total)) %>% 
-#   pmap(function(data1,data2,data3){
-#     data1 %>% 
-#       dplyr::select(exp_duration) %>% 
-#       map(~meffil.ewas( beta=as.matrix(data2), 
-#                         variable=.x, 
-#                         covariates = data3, 
-#                         batch = NULL, weights = NULL,  cell.counts = NULL,
-#                         isva = F, sva = F, smartsva = F, n.sv = NULL, 
-#                         winsorize.pct = NA, robust = TRUE,
-#                         rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
-#                         random.seed = 20240812, lmfit.safer = F, verbose = T))
-#   }) %>% 
-#   set_names("meffil_duration_noop_case", "meffil_duration_noop_ctrl", 
-#             "meffil_duration_noop_total",
-#             "meffil_duration_op_case", "meffil_duration_op_ctrl", 
-#             "meffil_duration_op_total") %>% 
-#   list2env(.,envir = .GlobalEnv)
-# 
-# test <- meffil_duration_noop_ctrl$exp_duration$analyses$all$table %>% 
-#   filter(-log10(p.value) > 6) %>% 
-#   rownames_to_column("cpg") %>%
-#   arrange(p.value)
-# 
-# 
-# save(meffil_duration_op_case, file = "meffil_duration_op_case.RData")
-# save(meffil_duration_op_ctrl, file = "meffil_duration_op_ctrl.RData")
-# save(meffil_duration_op_total, file = "meffil_duration_op_total.RData")
-# 
-# save(meffil_duration_noop_case, file = "meffil_duration_noop_case.RData")
-# save(meffil_duration_noop_ctrl, file = "meffil_duration_noop_ctrl.RData")
-# save(meffil_duration_noop_total, file = "meffil_duration_noop_total.RData")
 
 
 list(list(meffil_count_op_case, 
@@ -863,21 +824,21 @@ write_csv(test, here::here("tables", "gsea_champ_copper_3000.csv"))
 library(missMethyl)
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 
-topCpGs <- meffil_count_op_case$total$analyses$all$table %>% 
-  filter(-log10(p.value) > 4) %>% 
+topCpGs_case <- meffil_count_op_case$total$analyses$all$table %>% 
+  filter(-log10(p.value) > 6) %>% 
   rownames_to_column("cpg") %>%
   arrange(p.value)
 
-sigCpGs <- topCpGs %>% 
+sigCpGs <- topCpGs_case %>% 
   pull(cpg)
 
-gst_go <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(peg_noob_nors_win_total), collection="GO",
-                   plot.bias=TRUE)
+gst_go <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(PEG_NOOB_nors_filter_case), 
+                 collection="GO", plot.bias=TRUE)
 
 topGSA(gst_go, n=10)
 
-gst_kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(peg_noob_nors_win_total), collection="KEGG",
-              plot.bias=TRUE)
+gst_kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(PEG_NOOB_nors_filter_case), 
+                   collection="KEGG", plot.bias=TRUE)
 
 topGSA(gst_kegg, n=10)
 
