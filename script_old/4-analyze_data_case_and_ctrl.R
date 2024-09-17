@@ -667,13 +667,41 @@ ctrl_count_combined <- count_combine_copper[[2]] %>%
 total_count_combined <- list(case_count_combined, ctrl_count_combined) %>% 
   bind_rows()
 
+
+
+
 design_case <- model.matrix(~ total, data = count_combine_copper[[1]])
 design_ctrl <- model.matrix(~ ., data = ctrl_count_combined)
-design_total <- model.matrix(~ ., data = total_count_combined)
-# ?cpg.annotate()
+
+
+test <- count_combine_copper_total %>% 
+  mutate(copper_level = if_else(total > mean(total), "high", "low"))
+
+design_total <- model.matrix(~ total, data = count_combine_copper_total)
 # # Setting some annotation
+mvalue_total <- logit2(as.matrix(combined_resid_win_filter_total))
+myAnnotation_total <- cpg.annotate(object = mvalue_total, 
+                                   datatype = "array",
+                                   what = "Beta",
+                                   analysis.type = "differential",
+                                   design = design_total,
+                                   contrasts = FALSE,
+                                   coef = 2,
+                                   arraytype = "450K",
+                                   fdr = 0.05)
+
+dmr_dmrcate_total <- dmrcate(myAnnotation_total, lambda=1000, C=2)
+results.ranges_total <- extractRanges(dmr_dmrcate_total)
+results.ranges_total
+
+test_result_total <- results.ranges_total %>% 
+  as.data.frame() %>% 
+  filter(no.cpgs >= 7)
+
+
+# ?cpg.annotate()
+
 mvalue_case <- logit2(as.matrix(combined_resid_win_filter_case))
-ncol(design_case)
 myAnnotation_case <- cpg.annotate(object = mvalue_case, 
                              datatype = "array",
                              what = "M",
@@ -695,15 +723,7 @@ myAnnotation_ctrl <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_ctrl),
                                   arraytype = "450K",
                                   fdr = 0.05)
 
-myAnnotation_total <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_total), 
-                                  datatype = "array",
-                                  what = "Beta",
-                                  analysis.type = "differential",
-                                  design = design_total,
-                                  contrasts = FALSE,
-                                  coef = 2,
-                                  arraytype = "450K",
-                                  fdr = 0.05)
+
 str(myAnnotation_case)
 # 
 # # DMR analysis
@@ -1443,12 +1463,22 @@ mean_cpg_beta_case <- combined_resid_win_filter_case %>%
 mean_cpg_beta <- bind_cols(mean_cpg_beta_ctrl, mean_cpg_beta_case)
 
 ggplot(mean_cpg_beta, aes(x = mean_beta_ctrl, y = mean_beta_case)) +
-  geom_point() +
+  geom_point(alpha = 0.75) +
   geom_smooth(method = "lm") +
   stat_cor(label.y = 0.96) +
-  theme_classic() +
   labs(x = "Mean adjusted beta value for controls",
-       y = "Mean adjusted beta value for cases")
+       y = "Mean adjusted beta value for cases")+
+  theme_classic() +
+  theme( 
+    legend.position = "none",
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.title.y = element_markdown(face = "bold", size = 15),
+    axis.title.x = element_text(face = "bold", size = 15),
+    axis.text.y = element_text(size = 15), 
+    axis.text.x = element_text(angle = 60, size = 15, vjust = 0.5)
+  )
 
 # Making a volcano plot
 #making dataset
