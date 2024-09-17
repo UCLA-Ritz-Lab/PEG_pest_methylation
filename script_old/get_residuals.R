@@ -82,17 +82,20 @@ list(lb_sd_copper_wt_count[[1]][[2]], lb_sd_copper_wt_count[[2]][[2]]) %>%
   map(function(data){
     PEG_NOOB_nors_filter %>% 
       select(all_of(data %>% 
-                      pull(sampleid)))
+                      pull(sampleid))) %>%
+      apply(MARGIN = 1, dec_out) %>%
+      t() %>%
+      as.data.frame()
   }) %>% 
-  set_names("PEG_NOOB_nors_filter_case","PEG_NOOB_nors_filter_ctrl") %>%
+  set_names("PEG_NOOB_nors_win_filter_case","PEG_NOOB_nors_win_filter_ctrl") %>%
   list2env(.,envir = .GlobalEnv)
 
-save(PEG_NOOB_nors_filter_case, file = "PEG_NOOB_nors_filter_case.RData")
-save(PEG_NOOB_nors_filter_ctrl, file = "PEG_NOOB_nors_filter_ctrl.RData")
+save(PEG_NOOB_nors_win_filter_case, file = "PEG_NOOB_nors_win_filter_case.RData")
+save(PEG_NOOB_nors_win_filter_ctrl, file = "PEG_NOOB_nors_win_filter_ctrl.RData")
 
 #check rownames
-table(rownames(PEG_NOOB_nors_filter_case)==rownames(PEG_NOOB_nors_filter))
-table(rownames(PEG_NOOB_nors_filter_ctrl)==rownames(PEG_NOOB_nors_filter))
+table(rownames(PEG_NOOB_nors_win_filter_case)==rownames(PEG_NOOB_nors_filter))
+table(rownames(PEG_NOOB_nors_win_filter_ctrl)==rownames(PEG_NOOB_nors_filter))
 
 ####run empirical Bayes linear model####
 library(WGCNA)
@@ -100,7 +103,7 @@ p_count <- list(1:100000, 100001:200000, 200001:300000, 300001:349789)
 
 # separate the beta matrix to smaller datasets
 list(list(p_count, p_count),
-     list(PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl)) %>% 
+     list(PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl)) %>% 
   pmap(function(data1,data2){
     data1 %>% 
       map(function(list){
@@ -108,7 +111,7 @@ list(list(p_count, p_count),
           dplyr::slice(list)
       })
   }) %>% 
-  set_names("methyllist_case","methyllist_ctrl") %>% 
+  set_names("methyllist_case", "methyllist_ctrl") %>% 
   list2env(.,envir = .GlobalEnv)
 
 # run empirical Bayes linear model
@@ -146,11 +149,11 @@ list(adjusteddf_resid_case, adjusteddf_resid_ctrl) %>%
       t() %>% 
       as.data.frame()
   }) %>% 
-  set_names("combined_resid_case", "combined_resid_ctrl") %>% 
+  set_names("combined_resid_win_filter_case", "combined_resid_win_filter_ctrl") %>% 
   list2env(.,envir = .GlobalEnv)
 
-save(combined_resid_case, file = "combined_resid_case.RData")
-save(combined_resid_ctrl, file = "combined_resid_ctrl.RData")
+save(combined_resid_win_filter_case, file = "combined_resid_win_filter_case.RData")
+save(combined_resid_win_filter_ctrl, file = "combined_resid_win_filter_ctrl.RData")
 
 
 

@@ -377,15 +377,15 @@ library(ChAMP)
 
 dmp_count_case <- count_combine_copper[[1]] %>%
   dplyr::select(total) %>%
-  purrr::map(~champ.DMP(beta = combined_resid_case, 
+  purrr::map(~champ.DMP(beta = combined_resid_win_filter_case, 
                  pheno = .x,
                  compare.group = NULL,
-                 adjPVal = 0.05, adjust.method = "BH",
+                 adjPVal = 1, adjust.method = "BH",
                  arraytype = "450K")[[1]])
 
 dmp_count_ctrl <- count_combine_copper[[2]] %>%
   dplyr::select(total) %>%
-  purrr::map(~champ.DMP(beta = combined_resid_ctrl, 
+  purrr::map(~champ.DMP(beta = combined_resid_win_filter_ctrl, 
                         pheno = .x,
                         compare.group = NULL,
                         adjPVal = 0.05, adjust.method = "BH",
@@ -393,14 +393,24 @@ dmp_count_ctrl <- count_combine_copper[[2]] %>%
 
 dmp_count_total <- count_combine_copper_total %>%
   dplyr::select(total) %>%
-  purrr::map(~champ.DMP(beta = combined_resid_total, 
+  purrr::map(~champ.DMP(beta = combined_resid_win_filter_total, 
                         pheno = .x,
                         compare.group = NULL,
-                        adjPVal = 0.05, adjust.method = "BH",
+                        adjPVal = 1, adjust.method = "BH",
                         arraytype = "450K")[[1]])
 
-test <- dmp_count_total$total %>% 
+save(dmp_count_case, file = "dmp_count_case.RData")
+save(dmp_count_total, file = "dmp_count_total.RData")
+
+test_case <- dmp_count_case$total %>% 
   filter(-log10(P.Value) > 6)
+
+
+test_total <- dmp_count_total$total %>% 
+  filter(-log10(P.Value) > 6)
+
+setdiff(rownames(test_case), rownames(test_total))
+
 # dmp_count_total <- count_combine_copper_total %>%
 #   dplyr::select(total) %>%
 #   map(~champ.DMP(beta = combined_resid_total, 
@@ -420,20 +430,20 @@ DMP.GUI(DMP = dmp_count_case[[1]],
 
 #method 2: limma
 library(limma)
-case_count_combind <- count_combine_copper[[1]] %>% 
+case_count_combined <- count_combine_copper[[1]] %>% 
   left_join(covar_case_process[[2]], by = "pegid") %>% 
   left_join(count_combine_op[[1]], by = "pegid") %>% 
   dplyr::select(-c(pegid, count)) %>% 
   dplyr::rename(copper_count = total.x,
                 op_count = total.y)
 
-design <- model.matrix(~ ., data = case_count_combind)
-fit <- lmFit(PEG_NOOB_nors_win_filter_pd_r, design)
+design <- model.matrix(~ ., data = case_count_combined)
+fit <- lmFit(PEG_NOOB_nors_win_filter_case, design)
 fit2 <- eBayes(fit)
 sig_cpg_limma <- topTable(fit2, coef=ncol(design), sort.by="p",
-                          number = nrow(PEG_NOOB_nors_win_filter_pd_r), 
+                          number = nrow(PEG_NOOB_nors_win_filter_case), 
                           adjust.method = "BY") %>% 
-  filter(-log10(P.Value) > 6)
+  filter(-log10(P.Value) > 5)
 
 par(mfrow=c(2,5))
 sapply(rownames(sig_cpg_limma)[1:10], function(cpg){
@@ -508,7 +518,7 @@ covar_ctrl_combind <- covar_ctrl_process[[2]] %>%
 
 
 covar_total <- list(
-  list(covar_ctrl_combind, covar_case_combind),
+  list(covar_case_combind, covar_ctrl_combind),
   c("ctrl", "case")
 ) %>% 
   pmap(function(data1, data2){
@@ -528,10 +538,10 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
           count_combine_copper_total, 
           count_combine_copper[[1]], count_combine_copper[[2]], 
           count_combine_copper_total),
-     list(PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
-          peg_noob_nors_filter_total,
-          PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
-          peg_noob_nors_filter_total),
+     list(PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
+          peg_noob_nors_win_filter_total,
+          PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
+          peg_noob_nors_win_filter_total),
      list(covar_case_combind %>% dplyr::select(-count), 
           covar_ctrl_combind %>% dplyr::select(-count), 
           covar_total %>% dplyr::select(-count),
@@ -546,7 +556,7 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
                         isva = F, sva = F, smartsva = F, n.sv = NULL, 
                         winsorize.pct = NA, robust = TRUE,
                         rlm = FALSE, outlier.iqr.factor = NA,  featureset = NA, 
-                        random.seed = 20240812, lmfit.safer = F, verbose = T))
+                        random.seed = 20240916, lmfit.safer = F, verbose = T))
   }) %>% 
   set_names("meffil_count_noop_case", "meffil_count_noop_ctrl", 
             "meffil_count_noop_total",
@@ -579,10 +589,10 @@ list(list(meffil_count_op_case,
           meffil_count_op_ctrl, meffil_count_op_total,
           meffil_count_noop_case, 
           meffil_count_noop_ctrl, meffil_count_noop_total),
-     list(PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
-          peg_noob_nors_filter_total,
-          PEG_NOOB_nors_filter_case, PEG_NOOB_nors_filter_ctrl, 
-          peg_noob_nors_filter_total)) %>% 
+     list(PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
+          peg_noob_nors_win_filter_total,
+          PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
+          peg_noob_nors_win_filter_total)) %>% 
   pmap(function(meffil_list, data){
     meffil_list %>% 
       map(~ meffil.ewas.summary_fix(.x,data,
@@ -657,19 +667,22 @@ ctrl_count_combined <- count_combine_copper[[2]] %>%
 total_count_combined <- list(case_count_combined, ctrl_count_combined) %>% 
   bind_rows()
 
-design_case <- model.matrix(~ ., data = case_count_combined)
+design_case <- model.matrix(~ total, data = count_combine_copper[[1]])
 design_ctrl <- model.matrix(~ ., data = ctrl_count_combined)
 design_total <- model.matrix(~ ., data = total_count_combined)
 # ?cpg.annotate()
 # # Setting some annotation
-myAnnotation_case <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_case), 
+mvalue_case <- logit2(as.matrix(combined_resid_win_filter_case))
+ncol(design_case)
+myAnnotation_case <- cpg.annotate(object = mvalue_case, 
                              datatype = "array",
-                             what = "Beta",
+                             what = "M",
                              analysis.type = "differential",
                              design = design_case,
-                             contrasts = FALSE,
-                             coef = 2,
+                             coef = ncol(design_case),
                              arraytype = "450K",
+                             annotation = c(array = "IlluminaHumanMethylation450k", 
+                                            annotation = "ilmn12.hg19"),
                              fdr = 0.05)
 
 myAnnotation_ctrl <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_ctrl), 
@@ -694,17 +707,17 @@ myAnnotation_total <- cpg.annotate(object = as.matrix(PEG_NOOB_nors_filter_total
 str(myAnnotation_case)
 # 
 # # DMR analysis
-DMRs_case <- dmrcate(myAnnotation_case, lambda=1000, C=2)
+dmr_dmrcate_case <- dmrcate(myAnnotation_case, lambda=1000, C=2)
 
-save(DMRs_case, file = "DMRs_case.RData")
+save(dmr_dmrcate_case, file = "dmr_dmrcate_case.RData")
 ?dmrcate()
 ?extractRanges()
-results.ranges_case <- extractRanges(DMRs_case)
+results.ranges_case <- extractRanges(dmr_dmrcate_case)
 results.ranges_case
 
 test <- results.ranges_case %>% 
   as.data.frame() %>% 
-  filter(no.cpgs >=5)
+  filter(no.cpgs >= 7)
 
 # cols <- c(2,4)[count_combine_copper[[1]]$total]
 # names(cols) <-group
@@ -716,10 +729,19 @@ test <- results.ranges_case %>%
 #          what="Beta", arraytype="450K", genome="hg19")
 
 # method3: champ package
+list.dirs(here::here(),recursive = FALSE) %>%
+  list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+  grep("bumphunter",.,
+       value=TRUE, ignore.case = TRUE) %>%
+  # keep(~!str_detect(.x,"win|dmplist|old")) %>%
+  map(.,load,.GlobalEnv)
+
+
 list(
   list(count_combine_copper[[1]], count_combine_copper[[2]], 
        count_combine_copper_total),
-  list(combined_resid_case, combined_resid_ctrl, combined_resid_total)
+  list(combined_resid_win_filter_case, combined_resid_win_filter_ctrl, 
+       combined_resid_win_filter_total)
 ) %>% 
   pmap(function(data1, data2){
     data1 %>% 
@@ -727,41 +749,68 @@ list(
       map(~champ.DMR(beta = as.matrix(data2), 
                      pheno = .x, compare.group = NULL, 
                      arraytype = "450K", method = "Bumphunter", minProbes = 5, 
-                     adjPvalDmr = 0.05, cores = 10, maxGap = 300, cutoff = NULL, 
-                     pickCutoff = TRUE, smooth = TRUE, 
-                     smoothFunction = loessByCluster, useWeights = FALSE, 
-                     permutations = NULL, B = 250, nullMethod = "bootstrap", 
-                     meanLassoRadius = 375, minDmrSep = 1000, minDmrSize = 50, 
-                     adjPvalProbe = 0.05, Rplot = T, PDFplot = T, 
-                     resultsDir = here("dmr"), 
-                     rmSNPCH = T, fdr = 0.05, dist = 2, 
-                     mafcut = 0.05, lambda = 1000, C = 2))
+                     adjPvalDmr = 0.05, cores = 10, maxGap=300,
+                     cutoff=NULL,
+                     pickCutoff=TRUE,
+                     smooth=TRUE,
+                     smoothFunction=loessByCluster,
+                     useWeights=FALSE,
+                     permutations=NULL,
+                     B=250,
+                     nullMethod="bootstrap"))
   }) %>%
-  set_names("dmr_champ_copper_case", "dmr_champ_copper_ctrl", 
-            "dmr_champ_copper_total") %>%
+  set_names("dmr_bumphunter_champ_copper_case", "dmr_bumphunter_champ_copper_ctrl", 
+            "dmr_bumphunter_champ_copper_total") %>%
+  list2env(.,envir = .GlobalEnv)
+
+list(
+  list(count_combine_copper[[1]], count_combine_copper[[2]], 
+       count_combine_copper_total),
+  list(combined_resid_win_filter_case, combined_resid_win_filter_ctrl, 
+       combined_resid_win_filter_total)
+) %>% 
+  pmap(function(data1, data2){
+    data1 %>% 
+      dplyr::select(total) %>% 
+      map(~champ.DMR(beta = as.matrix(data2), 
+                     pheno = .x, compare.group = NULL, 
+                     arraytype = "450K", method = "DMRcate", minProbes = 5, 
+                     adjPvalDmr = 0.05, cores = 10,
+                     rmSNPCH=T,
+                     fdr=0.05,
+                     dist=2,
+                     mafcut=0.05,
+                     lambda=1000,
+                     C=2))
+  }) %>%
+  set_names("dmr_dmrcate_champ_copper_case", "dmr_dmrcate_champ_copper_ctrl", 
+            "dmr_dmrcate_champ_copper_total") %>%
   list2env(.,envir = .GlobalEnv)
 
 
-save(dmr_champ_copper_case, file = "dmr_champ_copper_case.RData")
-save(dmr_champ_copper_ctrl, file = "dmr_champ_copper_ctrl.RData")
-save(dmr_champ_copper_total, file = "dmr_champ_copper_total.RData")
+
+
+
+save(dmr_bumphunter_champ_copper_case, file = "dmr_bumphunter_champ_copper_case.RData")
+save(dmr_bumphunter_champ_copper_ctrl, file = "dmr_bumphunter_champ_copper_ctrl.RData")
+save(dmr_bumphunter_champ_copper_total, file = "dmr_bumphunter_champ_copper_total.RData")
 
 DMR.GUI(DMR  = dmr_champ_copper_case[[1]], 
         beta = as.matrix(combined_resid_case), 
         pheno = count_combine_copper[[1]]$total)
 
-test <- dmr_champ_copper_total$total$BumphunterDMR
-
-
-
-# GESA analysis -----------------------------------------------------------
+test <- dmr_bumphunter_champ_copper_case$total$BumphunterDMR
+test_dmrcate <- results.ranges_case %>% 
+  as.data.frame() %>% 
+  filter(no.cpgs >= 5)
+# GSEA analysis -----------------------------------------------------------
 
 ### method 1: ChAMP package (gometh)
 
 list(
-  list(combined_resid_case, combined_resid_total),
+  list(combined_resid_win_filter_case, combined_resid_win_filter_total),
   list(dmp_count_case, dmp_count_total),
-  list(dmr_champ_copper_case, dmr_champ_copper_total),
+  list(dmr_bumphunter_champ_copper_case, dmr_bumphunter_champ_copper_total),
   list(count_combine_copper[[1]],  
        count_combine_copper_total)
 ) %>% 
@@ -787,7 +836,9 @@ save(gsea_champ_copper_total, file = "gsea_champ_copper_total.RData")
 
 ### method 2: ChAMP package (empirical bayes)
 list(
-  list(combined_resid_case, combined_resid_ctrl, combined_resid_total),
+  list(combined_resid_win_filter_case, 
+       combined_resid_win_filter_ctrl, 
+       combined_resid_win_filter_total),
   list(count_combine_copper[[1]],
        count_combine_copper[[2]],
        count_combine_copper_total)
@@ -816,7 +867,7 @@ save(gsea_champ_copper_ebayes_total, file = "gsea_champ_copper_ebayes_total.RDat
 test <- gsea_champ_copper_case$DMP %>% 
   rownames_to_column("GO_term")
 
-write_csv(test, here::here("tables", "gsea_champ_copper_3000.csv"))
+
 
 
 ### method 2: missMethyl package
@@ -1122,10 +1173,40 @@ list(meffil_count_op_case, meffil_count_op_ctrl, meffil_count_op_total,
             "metal_list_noop_case","metal_list_noop_ctrl", "metal_list_noop_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
-list(metal_list_op_case, metal_list_op_ctrl, metal_list_op_total,
-     metal_list_noop_case, metal_list_noop_ctrl, metal_list_noop_total) %>% 
-  map(function(metal_list){
-    metal_list %>% 
+list(dmp_count_case, dmp_count_total) %>% 
+  map(function(dmp_list){
+    dmp_list %>% 
+      #keep(., map_lgl(., ~ nrow(.x)>=300)) %>% 
+      map(function(data){
+        datanew <- data %>% 
+          dplyr::rename(chr = CHR,
+                        p.value = P.Value) %>% 
+          mutate(chr = str_c("chr", chr),
+                 cpg = rownames(.)) %>% 
+          left_join(meffil_count_op_case$total$analyses$all$table %>%
+                      mutate(cpg = rownames(.)) %>%
+                      dplyr::select(cpg, position), by = "cpg")
+        
+        chromosomes <- paste("chr", c(1:22, "X","Y"), sep="")
+        chromosomes <- intersect(chromosomes, datanew$chr)
+        chromosome.lengths <- sapply(chromosomes, function(chromosome)
+          max(datanew$position[which(datanew$chr == chromosome)]))
+        
+        
+        chromosome.lengths <- as.numeric(chromosome.lengths)
+        chromosome.starts <- c(1,cumsum(chromosome.lengths)+1)
+        names(chromosome.starts) <- c(chromosomes, "NA")
+        datanew$global <- datanew$position + 
+          chromosome.starts[datanew$chr] - 1
+        datanew
+      })
+  }) %>% 
+  set_names("dmp_list_op_case", "dmp_list_op_total") %>% 
+  list2env(.,envir = .GlobalEnv)
+
+list(dmp_list_op_case, dmp_list_op_total) %>% 
+  map(function(dmp_list){
+    dmp_list %>% 
       map(function(data){
         data %>% 
           group_by(chr) %>% 
@@ -1133,15 +1214,13 @@ list(metal_list_op_case, metal_list_op_ctrl, metal_list_op_total,
           ungroup()
       })
   }) %>% 
-  set_names("axis_set_op_case", "axis_set_op_ctrl", "axis_set_op_total",
-            "axis_set_noop_case", "axis_set_noop_ctrl", "axis_set_noop_total") %>% 
+  set_names("axis_set_op_case",  "axis_set_op_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
 
-list(metal_list_op_case, metal_list_op_ctrl, metal_list_op_total,
-     metal_list_noop_case, metal_list_noop_ctrl, metal_list_noop_total) %>% 
-  map(function(metal_list){
-    metal_list %>% 
+list(dmp_list_op_case, dmp_list_op_total) %>% 
+  map(function(dmp_list){
+    dmp_list %>% 
       map(function(data){
         data %>% 
           filter(p.value == min(p.value)) %>% 
@@ -1149,29 +1228,29 @@ list(metal_list_op_case, metal_list_op_ctrl, metal_list_op_total,
           pull(ylim)
       })
   }) %>% 
-  set_names("ylim_op_case","ylim_op_ctrl", "ylim_op_total",
-            "ylim_noop_case","ylim_noop_ctrl", "ylim_noop_total") %>% 
+  set_names("ylim_op_case", "ylim_op_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
-
+library(ggrepel)
 list(
-  list(metal_list_op_case, axis_set_op_case, ylim_op_case),
-  list(metal_list_op_ctrl, axis_set_op_ctrl, ylim_op_ctrl),
-  list(metal_list_op_total, axis_set_op_total, ylim_op_total),
-  list(metal_list_noop_case, axis_set_noop_case, ylim_noop_case),
-  list(metal_list_noop_ctrl, axis_set_noop_ctrl, ylim_noop_ctrl),
-  list(metal_list_noop_total, axis_set_noop_total, ylim_noop_total)
+  list(dmp_list_op_case, axis_set_op_case, ylim_op_case),
+  list(dmp_list_op_total, axis_set_op_total, ylim_op_total)
   ) %>% 
   map(function(datalist){
     datalist %>% 
       pmap(function(pest, axis, ylim){
         pest %>% 
-          mutate(sig = if_else(-log10(p.value) > 6, 1, 0)) %>% 
+          mutate(sig = if_else(-log10(p.value) > 6, 1, 0),
+                 label = if_else(sig == 1, cpg, "")) %>% 
           ggplot(aes(x = global, y = -log10(p.value), 
                      color = as_factor(sig), size = -log10(p.value))) +
           scale_color_manual(values = c("1" = "red", "0" = "black")) +
           geom_hline(yintercept = -log10(10e-7), color = "red", linetype = "dashed") + 
           geom_point(alpha = 0.75) +
+          geom_label_repel(aes(label = label), 
+                           box.padding = 1,
+                           nudge_x = 0.25,
+                           nudge_y = 0.25) +
           scale_x_continuous(label = axis$chr, breaks = axis$center) +
           scale_y_continuous(expand = c(0,0), limits = c(0, ylim)) +
           #scale_color_manual(values = rep(c("#276FBF", "#183059"), unique(length(axis$chr)))) +
@@ -1192,11 +1271,23 @@ list(
           )
       })
   }) %>% 
-  set_names("manhattanlist_op_case", "manhattanlist_op_ctrl", 
-            "manhattanlist_op_total", "manhattanlist_noop_case", 
-            "manhattanlist_noop_ctrl", "manhattanlist_noop_total") %>% 
+  set_names("manhattanlist_op_case", "manhattanlist_op_total") %>% 
   list2env(.,envir = .GlobalEnv)
 
+test <- metal_list_op_case[[1]] %>% 
+  mutate(sig = if_else(-log10(p.value) > 6, 1, 0),
+         label = if_else(sig == 1, rownames(.), "")) %>% 
+  filter(sig == 1)
+
+
+test2 <- metal_list_op_total[[1]] %>% 
+  filter(-log10(p.value) > 6)
+  
+  mutate(sig = if_else(-log10(p.value) > 6, 1, 0),
+         label = if_else(sig == 1, rownames(.), "")) %>% 
+  filter(sig == 1)
+
+setdiff(test$label, test2$label)
 
 plotlist_noop <- list(manhattanlist_noop_total[[1]],
                  manhattanlist_noop_case[[1]], 
@@ -1232,19 +1323,24 @@ dev.off()
 
 # plot the top 10 most significantly differentially methylated CpGs in cases
 
+meffil_sig_total_op <- meffil_count_op_total$total$analyses$all$table %>% 
+  filter(-log10(p.value) > 6) %>% 
+  rownames_to_column("cpg") %>%
+  arrange(p.value)
+
 meffil_sig_case_op <- meffil_count_op_case$total$analyses$all$table %>% 
   filter(-log10(p.value) > 6) %>% 
   rownames_to_column("cpg") %>%
   arrange(p.value)
 
 mean_methylist_copper_new <- list(
-  list(peg_noob_nors_win_total, PEG_NOOB_nors_win_filter_pd_r, 
-       PEG_NOOB_nors_win_filter_ctrl_r),
+  list(peg_noob_nors_win_filter_total, PEG_NOOB_nors_win_filter_case, 
+       PEG_NOOB_nors_win_filter_ctrl),
   list(count_combine_copper_total, count_combine_copper[[1]], 
        count_combine_copper[[2]])
 ) %>% 
   pmap(function(df1, df2){
-    meffil_sig_case_op$cpg[1:10] %>% 
+    meffil_sig_total_op$cpg[1:10] %>% 
       map(function(cpg){
         df1 %>% 
           filter(rownames(.) %in% cpg) %>% 
@@ -1258,17 +1354,18 @@ mean_methylist_copper_new <- list(
           left_join(df2, by = "pegid") %>% 
           mutate(pd = if_else(pegid %in% case_ids$pegid, "case", "control"))
       })
-  }) 
+  }) %>% 
+  set_names("total", "case", "control")
 
 
 mean_methylist_copper_res_new <- list(
-  list(combined_resid_total, combined_resid_filter_pd_r, 
-       combined_resid_filter_ctrl_r),
+  list(combined_resid_win_filter_total, combined_resid_win_filter_case, 
+       combined_resid_win_filter_ctrl),
   list(count_combine_copper_total, count_combine_copper[[1]], 
        count_combine_copper[[2]])
 ) %>% 
   pmap(function(df1, df2){
-    meffil_sig_case_op$cpg[1:10] %>% 
+    meffil_sig_total_op$cpg[1:10] %>% 
       map(function(cpg){
         df1 %>% 
           filter(rownames(.) %in% cpg) %>% 
@@ -1282,11 +1379,12 @@ mean_methylist_copper_res_new <- list(
           left_join(df2, by = "pegid") %>% 
           mutate(pd = if_else(pegid %in% case_ids$pegid, "case", "control"))
       })
-  }) 
+  }) %>% 
+  set_names("total", "case", "control")
 
 plotlist_raw_copper_new <- mean_methylist_copper_new %>% 
   map(function(data){
-    list(data, meffil_sig_case_op$cpg[1:10]) %>% 
+    list(data, meffil_sig_total_op$cpg[1:10]) %>% 
       pmap(function(df, cpg){
         df %>% 
           ggplot(aes(x = total, y = beta_val, color = pd)) + 
@@ -1298,14 +1396,15 @@ plotlist_raw_copper_new <- mean_methylist_copper_new %>%
           theme_classic()+
           labs(title = cpg, 
                x = "Copper count",
-               y = "Beta values")
+               y = "Beta values",
+               legend = "PD status")
       })
   })
 
 
-plotlist_raw_copper_new <- mean_methylist_copper_res_new %>% 
+plotlist_res_copper_new <- mean_methylist_copper_res_new %>% 
   map(function(data){
-    list(data, meffil_sig_case_op$cpg[1:10]) %>% 
+    list(data, meffil_sig_total_op$cpg[1:10]) %>% 
       pmap(function(df, cpg){
         df %>% 
           ggplot(aes(x = total, y = beta_val, color = pd)) + 
@@ -1317,14 +1416,39 @@ plotlist_raw_copper_new <- mean_methylist_copper_res_new %>%
           theme_classic()+
           labs(title = cpg, 
                x = "Copper count",
-               y = "Adjusted beta values")
+               y = "Adjusted beta values",
+               color = "PD status")
       })
   })
 
-ggarrange(plotlist = plotlist_raw_copper_new[[1]],
+
+ggarrange(plotlist = plotlist_res_copper_new[[1]],
           # labels = c("A", "B", "C"),
           ncol = 5, nrow = 2)
 
+
+## scatter plot to check the association between case and control methylation levels
+# x-axis: cpg beta-value for controls
+# y-axis: cpg beta-value for cases
+
+
+mean_cpg_beta_ctrl <- combined_resid_win_filter_ctrl %>% 
+  mutate(mean_beta_ctrl = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
+  dplyr::select(mean_beta_ctrl)
+
+mean_cpg_beta_case <- combined_resid_win_filter_case %>%
+  mutate(mean_beta_case = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
+  dplyr::select(mean_beta_case)
+
+mean_cpg_beta <- bind_cols(mean_cpg_beta_ctrl, mean_cpg_beta_case)
+
+ggplot(mean_cpg_beta, aes(x = mean_beta_ctrl, y = mean_beta_case)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_cor(label.y = 0.96) +
+  theme_classic() +
+  labs(x = "Mean adjusted beta value for controls",
+       y = "Mean adjusted beta value for cases")
 
 # Making a volcano plot
 #making dataset

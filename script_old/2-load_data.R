@@ -71,15 +71,23 @@
     #   map(.,load,.GlobalEnv)
     # }
 
-  
-  # load residuals and filtered beta-matrix
+
+  # load residuals
   list.dirs(here(),recursive = FALSE) %>%
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-    grep("resid_case|resid_ctrl|nors_filter",.,
+    grep("combined_resid",.,
          value=TRUE, ignore.case = TRUE) %>%
-    # keep(~!str_detect(.x,"win|dmplist|old|more|90|0.1|archive")) %>%
+    keep(~!str_detect(.x,"dmplist|old|more|90|0.1|archive|95per")) %>%
+    keep(~str_detect(.x, "win_filter")) %>% 
     map(.,load,.GlobalEnv)
   
+  # load filtered beta-matrix
+  list.dirs(here::here(),recursive = FALSE) %>%
+    list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+    base::grep("noob",., 
+               value=TRUE, ignore.case = TRUE) %>%
+    discard(~str_detect(.x,"raw|old|new|archive|nors_filter|ctrl_|pd_")) %>%
+    map(.,load,.GlobalEnv)
   
   methl_name <- quote_all(datSampleSteve,datSamplePEG,cpg)
   list.dirs(here(),recursive = FALSE) %>%

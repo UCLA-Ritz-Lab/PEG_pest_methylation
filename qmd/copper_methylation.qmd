@@ -43,6 +43,23 @@ This project aims to investigate the association between copper pesticide exposu
     - Beta-matrix of DNA methylation
       - Filtered probes(cross-reactive/on SNPs/on sex chromosomes/non-CpG loci) 
       - Created a residual matrix to remove the unwanted variation(e.g., age at blood draw, sex, race, smoking status, study wave, cell composition and OP counts)
+      
+  - **Questions left since last time** 
+    - **Scatter plot: **
+      - Since no significant CpG popped up in controls, we need to check the association between case and control methylation levels
+      - x-axis: cpg beta-value for controls
+      - y-axis: cpg beta-value for cases
+
+  - **Gene set enrichment analysis**
+    - Put in all CpG sites into the analysis: 
+    - Separate into 4 groups: 
+      - 1.	Significant CpGs in the gene list
+      - 2.	Significant CpGs not in the gene list
+      - 3.	Not significant CpGs in the gene list
+      - 4.	Not significant CpGs not in the gene list
+
+  - **Region level analysis**
+    - Compare the results between ChAMP package and DMRcate package
 
 # Load and clean data
 
@@ -291,13 +308,14 @@ create_counts <- function(data){
     #   map(.,load,.GlobalEnv)
     # }
 
-  
+
   # load residuals
   list.dirs(here(),recursive = FALSE) %>%
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-    grep("filter_",.,
+    grep("combined_resid",.,
          value=TRUE, ignore.case = TRUE) %>%
-    keep(~!str_detect(.x,"win|dmplist|old|more|90|0.1|archive")) %>%
+    keep(~!str_detect(.x,"dmplist|old|more|90|0.1|archive|95per")) %>%
+    keep(~str_detect(.x, "win_filter")) %>% 
     map(.,load,.GlobalEnv) %>% 
     invisible()
   
@@ -305,8 +323,8 @@ create_counts <- function(data){
   list.dirs(here::here(),recursive = FALSE) %>%
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
     base::grep("noob",., 
-         value=TRUE, ignore.case = TRUE) %>%
-    discard(~str_detect(.x,"raw|old|new|archive|nors_filter")) %>%
+               value=TRUE, ignore.case = TRUE) %>%
+    discard(~str_detect(.x,"raw|old|new|archive|nors_filter|ctrl_|pd_")) %>%
     map(.,load,.GlobalEnv) %>% 
     invisible()
   
@@ -332,6 +350,7 @@ create_counts <- function(data){
     set_names(keyvar) %>%
     list2env(.,envir = .GlobalEnv) %>% 
     invisible()
+
 }
 ```
 
@@ -971,8 +990,6 @@ list(lb_sd_metal_wt_processed, lb_sd_copper_wt_processed,
   
 }
 
-
-
 list(
   c(lb_sd_metal_wt_count[[1]], lb_sd_metal_wt_count[[2]]),
   list(id_remove_c, id_remove_r, id_remove_c, id_remove_r)
@@ -987,12 +1004,12 @@ list(
   list2env(.,envir = .GlobalEnv) %>% 
   invisible()
 
-peg_noob_nors_win_total <- list(PEG_NOOB_nors_win_filter_ctrl_r, 
-                                PEG_NOOB_nors_win_filter_pd_r) %>% 
+peg_noob_nors_win_filter_total <- list(PEG_NOOB_nors_win_filter_case, 
+                                       PEG_NOOB_nors_win_filter_ctrl) %>% 
   bind_cols()
 
-combined_resid_total <- list(combined_resid_filter_ctrl_r, 
-                             combined_resid_filter_pd_r) %>% 
+combined_resid_win_filter_total <- list(combined_resid_win_filter_case, 
+                             combined_resid_win_filter_ctrl) %>% 
   bind_cols()
 
 ```
@@ -1103,7 +1120,7 @@ c(lb_sd_metal_wt_count[[1]],
               statistic = list(all_continuous() ~ "{mean} ({sd})",
                                all_categorical() ~ "{n} ({p}%)"),
               digits = list(all_continuous() ~ 1,
-                            all_categorical() ~ 1)) %>%
+                            all_categorical() ~ 0)) %>%
   add_overall() %>% 
   modify_header(label = "**Characteristics**") %>%
   # modify_spanning_header(starts_with("stat_") ~ "**PD status**") %>%
@@ -1125,9 +1142,9 @@ c(lb_sd_metal_wt_count[[1]],
 #for load result use
 list.dirs(here::here(),recursive = FALSE) %>%
   list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-  grep("meffil_count",.,
+  grep("dmp_count",.,
        value=TRUE, ignore.case = TRUE) %>%
-  # keep(~!str_detect(.x,"win|dmplist|old")) %>%
+  discard(~str_detect(.x,"old")) %>%
   map(.,load,.GlobalEnv) %>% 
   invisible()
 
@@ -1135,33 +1152,33 @@ list.dirs(here::here(),recursive = FALSE) %>%
 
 #### Manhatton plot
 
-![manhatton](figures/dmp_plot.png)
+##### Total (PD patients and no-PD controls) (N= 806)
+![manhatton](figures/dmp_plot_total.png)
 
-A total of 101 CpG sites were identified as differentially methylated with copper exposure in PD patients when adjusted for OP. The top 10 CpG sites are shown in the figure below. The x-axis represents the copper count, and the y-axis represents the beta value of CpG sites. We can see that the beta value of PD patients were consistently lower than controls across the top 10 CpG sites.
+
+##### PD patients (n = 569)
+![manhatton](figures/dmp_plot_case.png)
+
+A total of 140 CpG sites were identified as differentially methylated with copper exposure in our study sample when adjusted for OP. Another 41 CpGs were also identified solely in PD patients. The top 10 CpG sites are shown in the figure below. The x-axis represents the copper count, and the y-axis represents the beta value of CpG sites. We can see that the beta value of PD patients were consistently lower than controls across the top 10 CpG sites.
+
 
 
 #### Scatter plot
 
 ![scatter](figures/scatter_plot.png)
 
+![scatter](figures/beta_correlation_plot.png)
+
+
 #### EWAS table
 
 The detailed information of the differentially methylated CpG sites were shown in the table below.
 
+##### Total (PD patients and no-PD controls) (N= 806)
 ```{r}
-list.dirs(here::here(),recursive = FALSE) %>%
-  list.files("\\.csv$", full.names = TRUE, recursive = T) %>%
-  grep("annote_table_op_case",.,
-       value=TRUE, ignore.case = TRUE) %>%
-  # keep(~!str_detect(.x,"win|dmplist|old")) %>%
-  map(read_csv) %>% 
-  # mutate_at(vars(p.value:coefficeient.se), ~round(., 2)) %>%
-  set_names("annote_table_op_case") %>%
-  list2env(.,envir = .GlobalEnv) %>% 
-  invisible()
 
-datatable(annote_table_op_case %>% 
-            arrange(p.value), 
+datatable(dmp_count_total$total %>% 
+            arrange(P.Value), 
           rownames = FALSE,
           extensions = "Buttons",
           options = list(
@@ -1171,55 +1188,52 @@ datatable(annote_table_op_case %>%
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: EWAS analysis in PD patients"
+          caption = "Table: EWAS analysis in study sample (n = 806)"
           )
 ```
 
-*Scatter plot: *
-Since no significant CpG popped up in controls, we need to check the association between case and control methylation levels
-x-axis: cpg beta-value for controls
-y-axis: cpg beta-value for cases
-
-*Gene set enrichment analysis*
-Put in all CpG sites into the analysis: 
-Separate into 4 groups: 
-1.	Significant CpGs in the gene list
-2.	Significant CpGs not in the gene list
-3.	Not significant CpGs in the gene list
-4.	Not significant CpGs not in the gene list
-
-*Region level analysis*
-Compare the results between ChAMP package and DMRcate package
+##### PD patients (n = 569)
+```{r}
+datatable(dmp_count_case$total %>% 
+            arrange(P.Value), 
+          rownames = FALSE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE, 
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: EWAS analysis in PD patients (n = 569)"
+          )
+```
 
 
 ### Gene set enrichment analysis (GSEA)
 
-I applied `gometh` function in the `missMethyl` package to perform analysis. I used all CpGs with a p.value < 10E-4 (n = 3797) for the analysis in PD patients. (might not be correct)
+
+According to Dr. Paul's suggestion from last time, I put in all CpG sites in the `champ.gsea()` function and applied `gometh` method to identify the enriched GO terms and KEGG pathways. `gometh` method is a function in the `missMethyl` package that uses number of CpGs contained in genes to correct p-value. 
 
 ```{r}
-### method 2: missMethyl package
+### method 1: ChAMP package
 
-library(missMethyl)
-library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
-
-topCpGs_case <- meffil_count_op_case$total$analyses$all$table %>% 
-  filter(-log10(p.value) > 4) %>% 
-  rownames_to_column("cpg") %>%
-  arrange(p.value)
-
-sigCpGs_case <- topCpGs_case %>% 
-  pull(cpg)
+list.dirs(here::here(),recursive = FALSE) %>%
+  list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+  grep("gsea_champ",.,
+       value=TRUE, ignore.case = TRUE) %>%
+  map(.,load,.GlobalEnv) %>% 
+  invisible()
 
 ```
-
+  
 #### Gene ontology (GO) term analysis
 
-```{r}
-gst_go_case <- gometh(sig.cpg=sigCpGs_case, all.cpg=rownames(peg_noob_nors_win_total), 
-                 collection="GO",
-                 plot.bias=FALSE)
 
-datatable(gst_go_case %>% 
+##### Total (PD patients and non-PD controls) (n = 806)
+
+```{r}
+datatable(gsea_champ_copper_total$DMP %>% 
             arrange(`P.DE`), 
           rownames = FALSE,
           extensions = "Buttons",
@@ -1230,18 +1244,93 @@ datatable(gst_go_case %>%
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: Go term analysis in PD patients"
+          caption = "Table: Go term analysis in study sample (n = 806)"
+          )
+```
+
+
+##### PD patients (n = 569)
+
+```{r}
+
+datatable(gsea_champ_copper_case$DMP %>% 
+            arrange(`P.DE`), 
+          rownames = FALSE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE, 
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: Go term analysis in PD patients (n = 569)"
           )
 ```
 
 
 #### Kyoto Encyclopedia of Genes and Genomes (KEGG) pathway analysis
 
+Since `ChAMP` package does not provide `KEGG` pathway analysis, I used `missMethyl` package to do it.
+
+```{r}
+### method 2: missMethyl package
+
+library(missMethyl)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+
+topCpGs_case <- dmp_count_case$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
+  rownames_to_column("cpg") %>%
+  arrange(P.Value)
+
+topCpGs_total <- dmp_count_total$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
+  rownames_to_column("cpg") %>%
+  arrange(P.Value)
+
+
+sigCpGs_case_all <- topCpGs_case %>% 
+  pull(cpg)
+
+sigCpGs_total_all <- topCpGs_total %>% 
+  pull(cpg)
+
+```
+
+##### Total (PD patients and non-PD controls) (n = 806)
+
 ```{r}
 
-gst_kegg_case <- gometh(sig.cpg=sigCpGs_case, all.cpg=rownames(peg_noob_nors_win_total), 
-                   collection="KEGG",
-                   plot.bias=FALSE)
+gst_kegg_total <- gometh(sig.cpg = sigCpGs_total_all, 
+                        all.cpg = rownames(peg_noob_nors_win_filter_total), 
+                        collection = "KEGG", 
+                        plot.bias = FALSE)
+
+datatable(gst_kegg_total %>% 
+            arrange(`P.DE`), 
+          rownames = FALSE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE, 
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: KEGG pathway analysis in study sample (n = 806)"
+          )
+```
+
+
+##### PD patients (n = 569)
+
+```{r}
+
+gst_kegg_case <- gometh(sig.cpg = sigCpGs_case_all, 
+                        all.cpg = rownames(peg_noob_nors_win_filter_case), 
+                        collection = "KEGG", 
+                        plot.bias = FALSE)
 
 datatable(gst_kegg_case %>% 
             arrange(`P.DE`), 
@@ -1254,50 +1343,38 @@ datatable(gst_kegg_case %>%
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: KEGG pathway analysis in PD patients"
+          caption = "Table: KEGG pathway analysis in PD patients (n = 569)"
           )
 ```
 
 ## Region level analysis
 
-  - `DMRcate` package was applied to identify DMRs in PD patients.
+  - `ChAMP` package was applied to identify DMRs in the total study sample (n = 806) and PD patients (n = 569).
   - FDR < 0.05 for suggestive association
+  - **Three methods**
+    - `Bumphunter`: It scans the genome to detect regions with subtle but consistent differences across multiple CpGs.
+    - `DMRcate`: It uses a Gaussian kernel to smooth the p-values and identify regions with differential methylation. Somehow it doesn't work (still trying to figure out).
+    - `ProbeLasso`: It uses a Lasso regression model to identify regions with differential methylation. However, it does not allow pheno which contains more than 2 levels and the `compare.group` parameter must be specified. Therefore, I did not use this method in the analysis.
+  
 
 ### Differentially methylated regions (DMR)
 ```{r}
 list.dirs(here::here(),recursive = FALSE) %>%
   list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-  grep("DMRs",.,
+  grep("bumphunter",.,
        value=TRUE, ignore.case = TRUE) %>%
   # keep(~!str_detect(.x,"win|dmplist|old")) %>%
   map(.,load,.GlobalEnv) %>% 
   invisible()
+```
 
-# myAnnotation <- cpg.annotate(
-#   object = as.matrix(PEG_NOOB_nors_win_filter_pd_r), 
-#   datatype = "array",
-#   what = "Beta",
-#   analysis.type = "differential",
-#   design = design,
-#   contrasts = FALSE,
-#   coef = 2,
-#   arraytype = "450K",
-#   fdr = 0.05)
+#### Total (PD patients and non-PD controls) (n = 806)
 
-# 
-# # DMR analysis
-# DMRs <- dmrcate(myAnnotation, lambda=1000, C=2)
+```{r}
+dmr_table_total <- dmr_bumphunter_champ_copper_total$total$BumphunterDMR %>% 
+  arrange(p.valueArea)
 
-library(DMRcate)
-
-results.ranges <- extractRanges(DMRs)
-
-dmr_table <- results.ranges %>% 
-  as.data.frame() %>% 
-  arrange(min_smoothed_fdr) %>%
-  filter(no.cpgs >= 5)
-
-datatable(dmr_table, 
+datatable(dmr_table_total, 
           rownames = FALSE,
           extensions = "Buttons",
           options = list(
@@ -1307,20 +1384,42 @@ datatable(dmr_table,
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: DMR in PD patients"
+          caption = "Table: DMR in total study sample (n = 806)"
           )
 ```
+
+#### PD patients (n = 569)
+
+```{r}
+dmr_table_case <- dmr_bumphunter_champ_copper_case$total$BumphunterDMR %>%
+  arrange(p.valueArea)
+
+datatable(dmr_table_case, 
+          rownames = FALSE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE, 
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: DMR in PD patients (n = 569)"
+          )
+```
+
 
 ### Gene set testing for DMRs
 
+Same as CpG level analysis, I used `gometh` method in `ChAMP` and `missMethyl` package to identify the enriched GO terms and KEGG pathways for DMRs.
+
 #### Gene ontology (GO) term analysis
-```{r}
-gst.region_go <- goregion(results.ranges, 
-                          all.cpg=rownames(peg_noob_nors_win_total), 
-                       collection="GO", array.type="450K", plot.bias=FALSE)
 
-datatable(gst.region_go %>% 
-            arrange(`P.DE`),
+##### Total (PD patients and non-PD controls) (n = 806)
+
+```{r}
+datatable(gsea_champ_copper_total$DMR %>% 
+            arrange(`P.DE`), 
           rownames = FALSE,
           extensions = "Buttons",
           options = list(
@@ -1330,20 +1429,17 @@ datatable(gst.region_go %>%
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: Go term analysis for region level analysis in PD patients"
+          caption = "Table: Go term analysis in study sample (n = 806)"
           )
-
 ```
 
-#### KEGG pathway analysis
+
+##### PD patients (n = 569)
 
 ```{r}
-gst.region_kegg <- goregion(results.ranges, 
-                          all.cpg=rownames(peg_noob_nors_win_total), 
-                       collection="KEGG", array.type="450K", plot.bias=FALSE)
 
-datatable(gst.region_kegg %>% 
-            arrange(`P.DE`),
+datatable(gsea_champ_copper_case$DMR %>% 
+            arrange(`P.DE`), 
           rownames = FALSE,
           extensions = "Buttons",
           options = list(
@@ -1353,6 +1449,7 @@ datatable(gst.region_kegg %>%
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: KEGG pathway analysis for region level analysis in PD patients"
+          caption = "Table: Go term analysis in PD patients (n = 569)"
           )
 ```
+
