@@ -539,9 +539,9 @@ list(list(count_combine_copper[[1]], count_combine_copper[[2]],
           count_combine_copper[[1]], count_combine_copper[[2]], 
           count_combine_copper_total),
      list(PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
-          peg_noob_nors_win_filter_total,
+          PEG_NOOB_nors_win_filter_total,
           PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
-          peg_noob_nors_win_filter_total),
+          PEG_NOOB_nors_win_filter_total),
      list(covar_case_combind %>% dplyr::select(-count), 
           covar_ctrl_combind %>% dplyr::select(-count), 
           covar_total %>% dplyr::select(-count),
@@ -590,9 +590,9 @@ list(list(meffil_count_op_case,
           meffil_count_noop_case, 
           meffil_count_noop_ctrl, meffil_count_noop_total),
      list(PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
-          peg_noob_nors_win_filter_total,
+          PEG_NOOB_nors_win_filter_total,
           PEG_NOOB_nors_win_filter_case, PEG_NOOB_nors_win_filter_ctrl, 
-          peg_noob_nors_win_filter_total)) %>% 
+          PEG_NOOB_nors_win_filter_total)) %>% 
   pmap(function(meffil_list, data){
     meffil_list %>% 
       map(~ meffil.ewas.summary_fix(.x,data,
@@ -1354,7 +1354,7 @@ meffil_sig_case_op <- meffil_count_op_case$total$analyses$all$table %>%
   arrange(p.value)
 
 mean_methylist_copper_new <- list(
-  list(peg_noob_nors_win_filter_total, PEG_NOOB_nors_win_filter_case, 
+  list(PEG_NOOB_nors_win_filter_total, PEG_NOOB_nors_win_filter_case, 
        PEG_NOOB_nors_win_filter_ctrl),
   list(count_combine_copper_total, count_combine_copper[[1]], 
        count_combine_copper[[2]])

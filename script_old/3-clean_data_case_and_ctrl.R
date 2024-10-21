@@ -651,13 +651,7 @@ list(
             "sampleid_ctrl_c","sampleid_ctrl_r") %>% 
   list2env(.,envir = .GlobalEnv)
 
-peg_noob_nors_win_filter_total <- list(PEG_NOOB_nors_win_filter_case, 
-                                       PEG_NOOB_nors_win_filter_ctrl) %>% 
-  bind_cols()
 
-combined_resid_win_filter_total <- list(combined_resid_win_filter_case, 
-                             combined_resid_win_filter_ctrl) %>% 
-  bind_cols()
 
 
 #--------------------------------End of the code--------------------------------

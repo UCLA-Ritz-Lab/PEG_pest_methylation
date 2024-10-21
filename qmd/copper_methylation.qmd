@@ -1004,9 +1004,6 @@ list(
   list2env(.,envir = .GlobalEnv) %>% 
   invisible()
 
-peg_noob_nors_win_filter_total <- list(PEG_NOOB_nors_win_filter_case, 
-                                       PEG_NOOB_nors_win_filter_ctrl) %>% 
-  bind_cols()
 
 combined_resid_win_filter_total <- list(combined_resid_win_filter_case, 
                              combined_resid_win_filter_ctrl) %>% 
@@ -1335,7 +1332,7 @@ sigCpGs_total_all <- topCpGs_total %>%
 ```{r}
 
 gst_kegg_total <- gometh(sig.cpg = sigCpGs_total_all, 
-                        all.cpg = rownames(peg_noob_nors_win_filter_total), 
+                        all.cpg = rownames(PEG_NOOB_nors_win_filter_total), 
                         collection = "KEGG", 
                         plot.bias = FALSE)
 
