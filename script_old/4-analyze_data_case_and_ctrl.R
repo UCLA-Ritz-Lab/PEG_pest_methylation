@@ -66,10 +66,10 @@ hist(count_combine_metal_total$total)
 skim(count_combine_metal_total$total)
 
 hist(count_combine_copper_total$total)
-count_combine_copper_total %>% 
-  ggplot(aes(x = total)) + 
+count_combine_copper[[2]] %>% 
+  ggplot(aes(x = log(total+1))) + 
   geom_histogram(binwidth=1)
-skim(count_combine_copper_total$total)
+skim(count_combine_copper[[2]]$total)
 
 hist(count_combine_op_total$total)
 count_combine_op_total %>% 
@@ -383,12 +383,13 @@ dmp_count_case <- count_combine_copper[[1]] %>%
                  adjPVal = 1, adjust.method = "BH",
                  arraytype = "450K")[[1]])
 
+
 dmp_count_ctrl <- count_combine_copper[[2]] %>%
   dplyr::select(total) %>%
   purrr::map(~champ.DMP(beta = combined_resid_win_filter_ctrl, 
                         pheno = .x,
                         compare.group = NULL,
-                        adjPVal = 0.05, adjust.method = "BH",
+                        adjPVal = 1, adjust.method = "BH",
                         arraytype = "450K")[[1]])
 
 dmp_count_total <- count_combine_copper_total %>%
@@ -399,14 +400,29 @@ dmp_count_total <- count_combine_copper_total %>%
                         adjPVal = 1, adjust.method = "BH",
                         arraytype = "450K")[[1]])
 
+dmp_count_ctrlpd_total <- count_combine_copper_total %>%
+  dplyr::select(total) %>%
+  purrr::map(~champ.DMP(beta = combined_resid_nostudy_ctrlpd_win_filter_total, 
+                        pheno = .x,
+                        compare.group = NULL,
+                        adjPVal = 0.05, adjust.method = "BH",
+                        arraytype = "450K")[[1]])
+
 save(dmp_count_case, file = "dmp_count_case.RData")
+save(dmp_count_ctrl, file = "dmp_count_ctrl.RData")
 save(dmp_count_total, file = "dmp_count_total.RData")
+save(dmp_count_ctrlpd_total, file = "dmp_count_ctrlpd_total.RData")
 
 test_case <- dmp_count_case$total %>% 
   filter(-log10(P.Value) > 6)
 
+test_control <- dmp_count_ctrl$total %>% 
+  rownames_to_column("cpg")
 
 test_total <- dmp_count_total$total %>% 
+  filter(-log10(P.Value) > 6)
+
+test_ctrlpd_total <- dmp_count_ctrlpd_total$total %>% 
   filter(-log10(P.Value) > 6)
 
 setdiff(rownames(test_case), rownames(test_total))
@@ -427,6 +443,10 @@ DMP.GUI(DMP = dmp_count_case[[1]],
 #         beta = as.matrix(combined_resid_filter_ctrl_r), 
 #         pheno = count_combine_ctrl$total,
 #         cutgroupnumber = 2)
+
+## pearson correlation
+
+test_total
 
 #method 2: limma
 library(limma)
@@ -819,7 +839,7 @@ DMR.GUI(DMR  = dmr_champ_copper_case[[1]],
         beta = as.matrix(combined_resid_case), 
         pheno = count_combine_copper[[1]]$total)
 
-test <- dmr_bumphunter_champ_copper_case$total$BumphunterDMR
+test <- dmr_bumphunter_champ_copper_total$total$BumphunterDMR
 test_dmrcate <- results.ranges_case %>% 
   as.data.frame() %>% 
   filter(no.cpgs >= 5)
@@ -884,7 +904,7 @@ save(gsea_champ_copper_ebayes_case, file = "gsea_champ_copper_ebayes_case.RData"
 save(gsea_champ_copper_ebayes_ctrl, file = "gsea_champ_copper_ebayes_ctrl.RData")
 save(gsea_champ_copper_ebayes_total, file = "gsea_champ_copper_ebayes_total.RData")
 
-test <- gsea_champ_copper_case$DMP %>% 
+test <- gsea_champ_copper_total$DMP %>% 
   rownames_to_column("GO_term")
 
 
@@ -1260,8 +1280,10 @@ list(
     datalist %>% 
       pmap(function(pest, axis, ylim){
         pest %>% 
+          arrange(p.value) %>% 
           mutate(sig = if_else(-log10(p.value) > 6, 1, 0),
-                 label = if_else(sig == 1, cpg, "")) %>% 
+
+                 label = if_else(row_number() <= 10, cpg, "")) %>% 
           ggplot(aes(x = global, y = -log10(p.value), 
                      color = as_factor(sig), size = -log10(p.value))) +
           scale_color_manual(values = c("1" = "red", "0" = "black")) +
@@ -1343,15 +1365,21 @@ dev.off()
 
 # plot the top 10 most significantly differentially methylated CpGs in cases
 
-meffil_sig_total_op <- meffil_count_op_total$total$analyses$all$table %>% 
-  filter(-log10(p.value) > 6) %>% 
+dmp_sig_total_op <- dmp_count_total$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
   rownames_to_column("cpg") %>%
-  arrange(p.value)
+  arrange(P.Value)
 
-meffil_sig_case_op <- meffil_count_op_case$total$analyses$all$table %>% 
-  filter(-log10(p.value) > 6) %>% 
+dmp_sig_case_op <- dmp_count_case$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
   rownames_to_column("cpg") %>%
-  arrange(p.value)
+  arrange(P.Value)
+
+dmp_sole_case_op <- dmp_count_case$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
+  rownames_to_column("cpg") %>%
+  arrange(P.Value) %>% 
+  filter(cpg %notin% dmp_sig_total_op$cpg)
 
 mean_methylist_copper_new <- list(
   list(PEG_NOOB_nors_win_filter_total, PEG_NOOB_nors_win_filter_case, 
@@ -1360,7 +1388,7 @@ mean_methylist_copper_new <- list(
        count_combine_copper[[2]])
 ) %>% 
   pmap(function(df1, df2){
-    meffil_sig_total_op$cpg[1:10] %>% 
+    dmp_sole_case_op$cpg[1:10] %>% 
       map(function(cpg){
         df1 %>% 
           filter(rownames(.) %in% cpg) %>% 
@@ -1385,7 +1413,7 @@ mean_methylist_copper_res_new <- list(
        count_combine_copper[[2]])
 ) %>% 
   pmap(function(df1, df2){
-    meffil_sig_total_op$cpg[1:10] %>% 
+    dmp_sole_case_op$cpg[1:10] %>% 
       map(function(cpg){
         df1 %>% 
           filter(rownames(.) %in% cpg) %>% 
@@ -1404,7 +1432,7 @@ mean_methylist_copper_res_new <- list(
 
 plotlist_raw_copper_new <- mean_methylist_copper_new %>% 
   map(function(data){
-    list(data, meffil_sig_total_op$cpg[1:10]) %>% 
+    list(data, dmp_sole_case_op$cpg[1:10]) %>% 
       pmap(function(df, cpg){
         df %>% 
           ggplot(aes(x = total, y = beta_val, color = pd)) + 
@@ -1424,7 +1452,7 @@ plotlist_raw_copper_new <- mean_methylist_copper_new %>%
 
 plotlist_res_copper_new <- mean_methylist_copper_res_new %>% 
   map(function(data){
-    list(data, meffil_sig_total_op$cpg[1:10]) %>% 
+    list(data, dmp_sole_case_op$cpg[1:10]) %>% 
       pmap(function(df, cpg){
         df %>% 
           ggplot(aes(x = total, y = beta_val, color = pd)) + 
@@ -1442,32 +1470,62 @@ plotlist_res_copper_new <- mean_methylist_copper_res_new %>%
   })
 
 
-ggarrange(plotlist = plotlist_res_copper_new[[1]],
+ggarrange(plotlist = plotlist_raw_copper_new[[1]],
           # labels = c("A", "B", "C"),
           ncol = 5, nrow = 2)
 
+library(patchwork)
+patchwork::wrap_plots(plotlist_res_copper_new[[1]], ncol = 5,
+                      nrow = 2, guides = "collect")
 
 ## scatter plot to check the association between case and control methylation levels
 # x-axis: cpg beta-value for controls
 # y-axis: cpg beta-value for cases
 
 
-mean_cpg_beta_ctrl <- combined_resid_win_filter_ctrl %>% 
+mean_cpg_res_beta_ctrl <- combined_resid_win_filter_ctrl %>% 
   mutate(mean_beta_ctrl = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
   dplyr::select(mean_beta_ctrl)
 
-mean_cpg_beta_case <- combined_resid_win_filter_case %>%
+mean_cpg_beta_ctrl <- PEG_NOOB_nors_win_filter_ctrl %>% 
+  mutate(mean_beta_ctrl = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
+  dplyr::select(mean_beta_ctrl)
+
+mean_cpg_res_beta_case <- combined_resid_win_filter_case %>%
+  mutate(mean_beta_case = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
+  dplyr::select(mean_beta_case)
+
+mean_cpg_beta_case <- PEG_NOOB_nors_win_filter_case %>%
   mutate(mean_beta_case = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
   dplyr::select(mean_beta_case)
 
 mean_cpg_beta <- bind_cols(mean_cpg_beta_ctrl, mean_cpg_beta_case)
+mean_cpg_res_beta <- bind_cols(mean_cpg_res_beta_ctrl, mean_cpg_res_beta_case)
+
+ggplot(mean_cpg_res_beta, aes(x = mean_beta_ctrl, y = mean_beta_case)) +
+  geom_point(alpha = 0.75) +
+  geom_smooth(method = "lm") +
+  stat_cor(label.y = 0.96, size = 12) +
+  labs(x = "Mean adjusted beta value for controls",
+       y = "Mean adjusted beta value for cases")+
+  theme_classic() +
+  theme( 
+    legend.position = "none",
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.title.y = element_markdown(face = "bold", size = 15),
+    axis.title.x = element_text(face = "bold", size = 15),
+    axis.text.y = element_text(size = 15), 
+    axis.text.x = element_text(angle = 60, size = 15, vjust = 0.5)
+  )
 
 ggplot(mean_cpg_beta, aes(x = mean_beta_ctrl, y = mean_beta_case)) +
   geom_point(alpha = 0.75) +
   geom_smooth(method = "lm") +
-  stat_cor(label.y = 0.96) +
-  labs(x = "Mean adjusted beta value for controls",
-       y = "Mean adjusted beta value for cases")+
+  stat_cor(label.y = 0.96, size = 12) +
+  labs(x = "Mean original beta value for controls",
+       y = "Mean original beta value for cases")+
   theme_classic() +
   theme( 
     legend.position = "none",

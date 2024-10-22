@@ -314,10 +314,13 @@ create_counts <- function(data){
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
     grep("combined_resid",.,
          value=TRUE, ignore.case = TRUE) %>%
-    keep(~!str_detect(.x,"dmplist|old|more|90|0.1|archive|95per")) %>%
+    discard(~str_detect(.x,"dmplist|old|more|90|0.1|archive|95per|total")) %>%
     keep(~str_detect(.x, "win_filter")) %>% 
     map(.,load,.GlobalEnv) %>% 
     invisible()
+  
+    load(here("data", "methylation", "processed", 
+            "combined_resid_nostudy_ctrlpd_win_filter_total.RData"))
   
   # load filtered beta-matrix
   list.dirs(here::here(),recursive = FALSE) %>%
@@ -1004,10 +1007,9 @@ list(
   list2env(.,envir = .GlobalEnv) %>% 
   invisible()
 
-
-combined_resid_win_filter_total <- list(combined_resid_win_filter_case, 
-                             combined_resid_win_filter_ctrl) %>% 
+combined_resid_win_filter_total <- list(combined_resid_win_filter_case, combined_resid_win_filter_ctrl) %>% 
   bind_cols()
+
 
 ```
 
@@ -1153,27 +1155,27 @@ list.dirs(here::here(),recursive = FALSE) %>%
 ![manhatton](figures/dmp_plot_total.png)
 
 
-##### PD patients (n = 569)
-![manhatton](figures/dmp_plot_case.png)
-
 A total of 140 CpG sites were identified as differentially methylated with copper exposure in our study sample when adjusted for OP. Another 41 CpGs were also identified solely in PD patients. The top 10 CpG sites are shown in the figure below. The x-axis represents the copper count, and the y-axis represents the beta value of CpG sites. We can see that the beta value of PD patients were consistently lower than controls across the top 10 CpG sites.
 
 
 
 #### Scatter plot for the top 10 CpG sites (Copper count vs. beta value)
 
-![scatter](figures/scatter_plot.png)
+![scatter_total](figures/scatter_plot_residual_total.png)
+
+![scatter_solely_case](figures/scatter_plot_residual_sole_case.png)
 
 #### Scatter plot for methylation level between case and control
 
-![scatter_correlation](figures/beta_correlation_plot.png)
+![scatter_correlation_original](figures/beta_correlation_plot_original.png)
 
+![scatter_correlation_adjusted](figures/beta_correlation_plot_adjusted.png)
 
 #### EWAS table
 
 The detailed information of the differentially methylated CpG sites were shown in the table below.
 
-##### Total (PD patients and no-PD controls) (N= 806)
+##### Total (PD patients and no-PD controls, without controlling for PD status) (N= 806)
 ```{r}
 
 datatable(dmp_count_total$total %>% 
@@ -1188,13 +1190,13 @@ datatable(dmp_count_total$total %>%
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: EWAS analysis in study sample (n = 806)"
+          caption = "Table: EWAS analysis in total study sample without controlling for PD status (n = 806)"
           )
 ```
 
-##### PD patients (n = 569)
+##### Total (PD patients and no-PD controls, controlling for PD status) (N= 806)
 ```{r}
-datatable(dmp_count_case$total %>% 
+datatable(dmp_count_ctrlpd_total$total %>% 
             filter(-log10(P.Value) > 6) %>% 
             arrange(P.Value), 
           rownames = TRUE,
@@ -1206,7 +1208,7 @@ datatable(dmp_count_case$total %>%
                          paging=TRUE,
                          # fixedHeader=TRUE,
                          className = 'dt-center', targets = 0:4),
-          caption = "Table: EWAS analysis in PD patients (n = 569)"
+          caption = "Table: EWAS analysis in total study sample controlling for PD status (n = 806)"
           )
 ```
 
@@ -1278,23 +1280,23 @@ datatable(gsea_champ_copper_total$DMP %>%
 ```
 
 
-##### PD patients (n = 569)
+<!-- ##### PD patients (n = 569) -->
 
 ```{r}
-
-datatable(gsea_champ_copper_case$DMP %>% 
-            arrange(`P.DE`), 
-          rownames = TRUE,
-          extensions = "Buttons",
-          options = list(
-            dom = "Bfrtip",
-            buttons = c("copy", "csv", "excel", "pdf", "print"),
-            scrollX = TRUE, 
-                         paging=TRUE,
-                         # fixedHeader=TRUE,
-                         className = 'dt-center', targets = 0:4),
-          caption = "Table: Go term analysis in PD patients (n = 569)"
-          )
+# 
+# datatable(gsea_champ_copper_case$DMP %>% 
+#             arrange(`P.DE`), 
+#           rownames = TRUE,
+#           extensions = "Buttons",
+#           options = list(
+#             dom = "Bfrtip",
+#             buttons = c("copy", "csv", "excel", "pdf", "print"),
+#             scrollX = TRUE, 
+#                          paging=TRUE,
+#                          # fixedHeader=TRUE,
+#                          className = 'dt-center', targets = 0:4),
+#           caption = "Table: Go term analysis in PD patients (n = 569)"
+#           )
 ```
 
 
@@ -1353,9 +1355,9 @@ datatable(gst_kegg_total %>%
 ```
 
 
-##### PD patients (n = 569)
+<!-- ##### PD patients (n = 569) -->
 
-No significant KEGG pathway was identified in PD patients.
+<!-- No significant KEGG pathway was identified in PD patients. -->
 
 ```{r}
 
@@ -1405,26 +1407,26 @@ datatable(gsea_champ_copper_ebayes_total$GSEA[[1]] %>%
 ```
 
 
-##### PD patients (n = 569)
+<!-- ##### PD patients (n = 569) -->
 
 ```{r}
-datatable(gsea_champ_copper_ebayes_case$GSEA[[1]] %>% 
-            as.data.frame() %>%
-            rownames_to_column("gene_set") %>%
-            mutate(gene_set = str_replace_all(gene_set, "_", " "),
-                   gene_set = str_to_lower(gene_set)) %>%
-            arrange(`P(WT)`), 
-          rownames = FALSE,
-          extensions = "Buttons",
-          options = list(
-            dom = "Bfrtip",
-            buttons = c("copy", "csv", "excel", "pdf", "print"),
-            scrollX = TRUE, 
-                         paging=TRUE,
-                         # fixedHeader=TRUE,
-                         className = 'dt-center', targets = 0:4),
-          caption = "Table: Empirical bayes GSEA in PD patients (n = 569)"
-          )
+# datatable(gsea_champ_copper_ebayes_case$GSEA[[1]] %>% 
+#             as.data.frame() %>%
+#             rownames_to_column("gene_set") %>%
+#             mutate(gene_set = str_replace_all(gene_set, "_", " "),
+#                    gene_set = str_to_lower(gene_set)) %>%
+#             arrange(`P(WT)`), 
+#           rownames = FALSE,
+#           extensions = "Buttons",
+#           options = list(
+#             dom = "Bfrtip",
+#             buttons = c("copy", "csv", "excel", "pdf", "print"),
+#             scrollX = TRUE, 
+#                          paging=TRUE,
+#                          # fixedHeader=TRUE,
+#                          className = 'dt-center', targets = 0:4),
+#           caption = "Table: Empirical bayes GSEA in PD patients (n = 569)"
+#           )
 ```
 
 
@@ -1477,24 +1479,24 @@ datatable(dmr_table_total,
           )
 ```
 
-#### PD patients (n = 569)
+<!-- #### PD patients (n = 569) -->
 
 ```{r}
-dmr_table_case <- dmr_bumphunter_champ_copper_case$total$BumphunterDMR %>%
-  arrange(p.valueArea)
-
-datatable(dmr_table_case, 
-          rownames = TRUE,
-          extensions = "Buttons",
-          options = list(
-            dom = "Bfrtip",
-            buttons = c("copy", "csv", "excel", "pdf", "print"),
-            scrollX = TRUE, 
-                         paging=TRUE,
-                         # fixedHeader=TRUE,
-                         className = 'dt-center', targets = 0:4),
-          caption = "Table: DMR in PD patients (n = 569)"
-          )
+# dmr_table_case <- dmr_bumphunter_champ_copper_case$total$BumphunterDMR %>%
+#   arrange(p.valueArea)
+# 
+# datatable(dmr_table_case, 
+#           rownames = TRUE,
+#           extensions = "Buttons",
+#           options = list(
+#             dom = "Bfrtip",
+#             buttons = c("copy", "csv", "excel", "pdf", "print"),
+#             scrollX = TRUE, 
+#                          paging=TRUE,
+#                          # fixedHeader=TRUE,
+#                          className = 'dt-center', targets = 0:4),
+#           caption = "Table: DMR in PD patients (n = 569)"
+#           )
 ```
 
 
@@ -1523,22 +1525,22 @@ datatable(gsea_champ_copper_total$DMR %>%
 ```
 
 
-##### PD patients (n = 569)
+<!-- ##### PD patients (n = 569) -->
 
 ```{r}
 
-datatable(gsea_champ_copper_case$DMR %>% 
-            arrange(`P.DE`), 
-          rownames = TRUE,
-          extensions = "Buttons",
-          options = list(
-            dom = "Bfrtip",
-            buttons = c("copy", "csv", "excel", "pdf", "print"),
-            scrollX = TRUE, 
-                         paging=TRUE,
-                         # fixedHeader=TRUE,
-                         className = 'dt-center', targets = 0:4),
-          caption = "Table: Go term analysis in PD patients (n = 569)"
-          )
+# datatable(gsea_champ_copper_case$DMR %>% 
+#             arrange(`P.DE`), 
+#           rownames = TRUE,
+#           extensions = "Buttons",
+#           options = list(
+#             dom = "Bfrtip",
+#             buttons = c("copy", "csv", "excel", "pdf", "print"),
+#             scrollX = TRUE, 
+#                          paging=TRUE,
+#                          # fixedHeader=TRUE,
+#                          className = 'dt-center', targets = 0:4),
+#           caption = "Table: Go term analysis in PD patients (n = 569)"
+#           )
 ```
 

@@ -651,7 +651,8 @@ list(
             "sampleid_ctrl_c","sampleid_ctrl_r") %>% 
   list2env(.,envir = .GlobalEnv)
 
-
-
+combined_resid_win_filter_total <- list(combined_resid_win_filter_case, 
+                                        combined_resid_win_filter_ctrl) %>% 
+  bind_cols()
 
 #--------------------------------End of the code--------------------------------

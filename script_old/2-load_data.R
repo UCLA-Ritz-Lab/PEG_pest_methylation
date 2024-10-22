@@ -63,12 +63,12 @@
   #   
   #   
     #for load result use
-    # list.dirs(here::here(),recursive = FALSE) %>%
-    #   list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
-    #   grep("meffil_count",.,
-    #        value=TRUE, ignore.case = TRUE) %>%
-    #   # keep(~!str_detect(.x,"win|dmplist|old")) %>%
-    #   map(.,load,.GlobalEnv)
+    list.dirs(here::here(),recursive = FALSE) %>%
+      list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+      grep("meffil_count",.,
+           value=TRUE, ignore.case = TRUE) %>%
+      # keep(~!str_detect(.x,"win|dmplist|old")) %>%
+      map(.,load,.GlobalEnv)
     # }
 
 
@@ -77,9 +77,12 @@
     list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
     grep("combined_resid",.,
          value=TRUE, ignore.case = TRUE) %>%
-    keep(~!str_detect(.x,"dmplist|old|more|90|0.1|archive|95per")) %>%
+    discard(~str_detect(.x,"dmplist|old|more|90|0.1|archive|95per|total")) %>%
     keep(~str_detect(.x, "win_filter")) %>% 
     map(.,load,.GlobalEnv)
+  
+  load(here("data", "methylation", "processed", 
+            "combined_resid_nostudy_ctrlpd_win_filter_total.RData"))
   
   # load filtered beta-matrix
   list.dirs(here::here(),recursive = FALSE) %>%
