@@ -1147,6 +1147,13 @@ list.dirs(here::here(),recursive = FALSE) %>%
   map(.,load,.GlobalEnv) %>% 
   invisible()
 
+list.dirs(here::here(),recursive = FALSE) %>%
+  list.files("\\.RData$", full.names = TRUE, recursive = T) %>%
+  grep("bicor",.,
+       value=TRUE, ignore.case = TRUE) %>%
+  map(.,load,.GlobalEnv) %>% 
+  invisible()
+
 ```
 
 #### Manhatton plot
@@ -1194,6 +1201,64 @@ datatable(dmp_count_total$total %>%
           )
 ```
 
+##### Bicor association (PD patients and no-PD controls, without controlling for PD status) (N= 806)
+
+```{r}
+
+sig_cpg <- dmp_count_total$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
+  arrange(P.Value) %>% 
+  rownames_to_column("cpg")
+
+bicor_combined <- list(
+  list(dmp_count_total, dmp_count_case, dmp_count_ctrl),
+  list("p.value_total", "p.value_case", "p.value_ctrl"),
+  list(bicor_total, bicor_case, bicor_ctrl),
+  list("cor_total", "cor_case", "cor_ctrl")
+) %>% 
+  pmap(function(data1, data2, data3, data4){
+    data1$total %>% 
+      rownames_to_column("cpg") %>%
+      filter(cpg %in% sig_cpg$cpg) %>%
+      dplyr::rename(!!data2 := P.Value) %>% 
+      select(cpg, !!data2) %>% 
+      left_join(
+        data3 %>% 
+          rename_all(str_to_lower) %>%
+          dplyr::rename(cpg = id, !!data4 := cor) %>% 
+          select(cpg, !!data4), 
+        by = "cpg"
+      ) %>% 
+      relocate(cpg, !!data4, !!data2)
+  }) %>% 
+  purrr::reduce(left_join, by = "cpg")
+
+dmp_table_final <- sig_cpg %>% 
+  dplyr::rename_all(str_to_lower) %>%
+  dplyr::rename(pos = mapinfo,
+         gene_region = feature,
+         coefficient = b,
+         ) %>% 
+  select(cpg, chr, pos, gene, gene_region, probe_snps, probe_snps_10) %>% 
+  left_join(bicor_combined, by = "cpg")
+
+
+datatable(dmp_table_final, 
+          rownames = FALSE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE, 
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: Biweight midcorrelation in total study sample (n = 806)"
+          )
+
+```
+
+
 ##### Total (PD patients and no-PD controls, controlling for PD status) (N= 806)
 ```{r}
 datatable(dmp_count_ctrlpd_total$total %>% 
@@ -1234,7 +1299,7 @@ datatable(dmp_count_case$total %>%
           )
 ```
 
-### Gene set enrichment analysis (GSEA)
+### Gene set enrichment analysis (GSEA) and pathway analysis
 
 
 According to Dr. Paul's suggestion from last time, I put in all CpG sites in the `champ.gsea()` function and applied `gometh` method to identify the enriched GO terms and KEGG pathways. `gometh` method is a function in the `missMethyl` package that uses number of CpGs contained in genes to correct p-value. In addition, I also tried the newly developed `ebGSEA` [method](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6748733/) in the `ChAMP` [package](https://github.com/aet21/ebGSEA), which ranks genes instead of CpGs, according to the overall level of differential methylation. 
@@ -1306,9 +1371,8 @@ Since `ChAMP` package does not provide `KEGG` pathway analysis, I used `missMeth
 
 ```{r}
 ### method 2: missMethyl package
+pacman::p_load(missMethyl, IlluminaHumanMethylation450kanno.ilmn12.hg19)
 
-library(missMethyl)
-library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 
 topCpGs_case <- dmp_count_case$total %>% 
   filter(-log10(P.Value) > 6) %>% 
@@ -1386,7 +1450,7 @@ datatable(gst_kegg_total %>%
 ##### Total (PD patients and non-PD controls) (n = 806)
 
 ```{r}
-library(DT)
+
 datatable(gsea_champ_copper_ebayes_total$GSEA[[1]] %>% 
             as.data.frame() %>%
             rownames_to_column("gene_set") %>%
@@ -1427,6 +1491,58 @@ datatable(gsea_champ_copper_ebayes_total$GSEA[[1]] %>%
 #                          className = 'dt-center', targets = 0:4),
 #           caption = "Table: Empirical bayes GSEA in PD patients (n = 569)"
 #           )
+```
+
+#### PATHER pathway analysis
+
+```{r}
+pacman::p_load(PANTHER.db, methylGSA)
+pthOrganisms(PANTHER.db) <- "HUMAN"
+
+go_ids <- keys(PANTHER.db,keytype="PATHWAY_ID")
+cols <- "ENTREZ"
+panther <- mapIds(PANTHER.db, keys=go_ids, column=cols, 
+                  as.numeric(cols), keytype="PATHWAY_ID", multiVals="list")
+
+panther_inner <- select(PANTHER.db, keys=go_ids, column=cols, 
+                        keytype="PATHWAY_ID", jointype = "left")
+
+methylglm_pan_total_op <- methylglm(cpg.pval = sig_cpg %>% 
+                                     pull(P.Value) %>% 
+                                     set_names(sig_cpg$cpg),
+                                GS.list = panther, GS.idtype = "ENTREZID")
+
+
+# ?methylglm()
+#get pathway names
+cols <- "PATHWAY_TERM"
+res.p <- mapIds(PANTHER.db, keys=go_ids, column=cols, 
+                as.numeric(cols), keytype="PATHWAY_ID", multiVals="list")
+
+panther.names <- res.p %>% 
+  bind_rows() %>% 
+  gather() %>% 
+  transmute(
+    ID = key,
+    pathway = value
+  )
+
+methylglm_path_total_op <- methylglm_pan_total_op %>% 
+  left_join(panther.names, by = "ID")
+
+datatable(methylglm_path_total_op, 
+          rownames = TRUE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE, 
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: PATHER pathway analysis in total study sample (n = 806)"
+          )
+
 ```
 
 

@@ -1187,7 +1187,7 @@ columns(PANTHER.db)
 keytypes(PANTHER.db)
 
 go_ids <- keys(PANTHER.db,keytype="PATHWAY_ID")
-cols <- "ENTREZ"
+cols <- "GOSLIM_ID"
 panther <- mapIds(PANTHER.db, keys=go_ids, column=cols, 
                   as.numeric(cols), keytype="PATHWAY_ID", multiVals="list")
 lengths(panther)
@@ -1195,28 +1195,40 @@ panther_inner <- select(PANTHER.db, keys=go_ids, column=cols,
                         keytype="PATHWAY_ID", jointype = "left")
 #ALL CpG sites
 #GSEA for panther pathways
-library(org.Hs.eg.db)
-
-test <- org.Hs.egGO
-
-mapped_genes <- mappedkeys(test)
-
-test_list <- as.list(test[mapped_genes])
-
-if(length(test_list) > 0){
-  got <- test_list[[1]]
-  got[[1]][["GOID"]]
-  got[[1]][["ONTOLOGY"]]
-  got[[1]][["Evidence"]]
-}
-
-# BiocManager::install("methylGSA")
-# library(methylGSA)
-# methylglm_pan_case_op <- methylglm(cpg.pval = meta.cpg_op_case[[1]], 
-#                                 GS.list = panther, GS.idtype = "ENTREZID")
+# library(org.Hs.eg.db)
 # 
-# methylglm_pan_case_noop <- methylglm(cpg.pval = meta.cpg_noop_case[[1]], 
-#                                 GS.list = panther, GS.idtype = "ENTREZID")
+# test <- org.Hs.egGO
+# 
+# mapped_genes <- mappedkeys(test)
+# 
+# test_list <- as.list(test[mapped_genes])
+# 
+# if(length(test_list) > 0){
+#   got <- test_list[[1]]
+#   got[[1]][["GOID"]]
+#   got[[1]][["ONTOLOGY"]]
+#   got[[1]][["Evidence"]]
+# }
+
+
+library(methylGSA)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+sig_cpg <- dmp_count_total$total %>% 
+  filter(-log10(P.Value) > 6) %>% 
+  arrange(P.Value) %>% 
+  rownames_to_column("cpg")
+
+methylglm_pan_total_op <- methylglm(cpg.pval = sig_cpg %>% 
+                                     pull(P.Value) %>% 
+                                     set_names(sig_cpg$cpg),
+                                GS.list = panther, GS.idtype = "ENTREZID")
+
+test <- gsea_champ_copper_total$DMP %>% 
+  arrange(`P.DE`) %>% 
+  rownames_to_column("GOSLIM_ID") %>% 
+  left_join(panther_inner %>% 
+              dplyr::select(PATHWAY_ID, GOSLIM_ID), by = "GOSLIM_ID") %>% 
+  distinct()
 # ?methylglm()
 #get pathway names
 cols <- "PATHWAY_TERM"
@@ -1231,11 +1243,9 @@ panther.names <- res.p %>%
     pathway = value
   )
 
-methylglm_path_case_op <- methylglm_pan_case_op %>% 
+methylglm_path_total_op <- methylglm_pan_total_op %>% 
   left_join(panther.names, by = "ID")
 
-methylglm_path_case_noop <- methylglm_pan_case_noop %>% 
-  left_join(panther.names, by = "ID")
 
 # Visulization ------------------------------------------------------------
 
