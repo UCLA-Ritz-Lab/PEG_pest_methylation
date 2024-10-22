@@ -414,10 +414,12 @@ save(dmp_count_total, file = "dmp_count_total.RData")
 save(dmp_count_ctrlpd_total, file = "dmp_count_ctrlpd_total.RData")
 
 test_case <- dmp_count_case$total %>% 
-  filter(-log10(P.Value) > 6)
+  rownames_to_column("cpg") %>% 
+  filter(cpg %in% rownames(test_total))
 
 test_control <- dmp_count_ctrl$total %>% 
-  rownames_to_column("cpg")
+  rownames_to_column("cpg") %>% 
+  filter(cpg %in% rownames(test_total))
 
 test_total <- dmp_count_total$total %>% 
   filter(-log10(P.Value) > 6)
@@ -645,6 +647,42 @@ list(list(ewas.summary_count_op_case,
             "reports", data3, paste(data2, data3, ".html", sep = "_")))
       })
   })
+
+
+# Association test --------------------------------------------------------
+
+### Pearson correlation
+library(WGCNA)
+
+
+bicor_total <- standardScreeningNumericTrait(
+  datExpr = t(combined_resid_win_filter_total %>% 
+                filter(rownames(.) %in% dmp_sig_total_op$cpg)),
+  yNumeric = count_combine_copper_total$total,
+  corFnc = "bicor",
+  alternative = "two.sided"
+)
+
+bicor_case <- standardScreeningNumericTrait(
+  datExpr = t(combined_resid_win_filter_case %>% 
+                filter(rownames(.) %in% dmp_sig_total_op$cpg)),
+  yNumeric = count_combine_copper[[1]]$total,
+  corFnc = "bicor",
+  alternative = "two.sided"
+)
+
+bicor_ctrl <- standardScreeningNumericTrait(
+  datExpr = t(combined_resid_win_filter_ctrl %>% 
+                filter(rownames(.) %in% dmp_sig_total_op$cpg)),
+  yNumeric = count_combine_copper[[2]]$total,
+  corFnc = "bicor",
+  alternative = "two.sided"
+)
+
+
+save(bicor_total, file = "bicor_total.RData")
+save(bicor_case, file = "bicor_case.RData")
+save(bicor_ctrl, file = "bicor_ctrl.RData")
 
 # DMR analysis ------------------------------------------------------------
 
@@ -1157,12 +1195,29 @@ panther_inner <- select(PANTHER.db, keys=go_ids, column=cols,
                         keytype="PATHWAY_ID", jointype = "left")
 #ALL CpG sites
 #GSEA for panther pathways
-methylglm_pan_case_op <- methylglm(cpg.pval = meta.cpg_op_case[[1]], 
-                                GS.list = panther, GS.idtype = "ENTREZID")
+library(org.Hs.eg.db)
 
-methylglm_pan_case_noop <- methylglm(cpg.pval = meta.cpg_noop_case[[1]], 
-                                GS.list = panther, GS.idtype = "ENTREZID")
-?methylglm()
+test <- org.Hs.egGO
+
+mapped_genes <- mappedkeys(test)
+
+test_list <- as.list(test[mapped_genes])
+
+if(length(test_list) > 0){
+  got <- test_list[[1]]
+  got[[1]][["GOID"]]
+  got[[1]][["ONTOLOGY"]]
+  got[[1]][["Evidence"]]
+}
+
+# BiocManager::install("methylGSA")
+# library(methylGSA)
+# methylglm_pan_case_op <- methylglm(cpg.pval = meta.cpg_op_case[[1]], 
+#                                 GS.list = panther, GS.idtype = "ENTREZID")
+# 
+# methylglm_pan_case_noop <- methylglm(cpg.pval = meta.cpg_noop_case[[1]], 
+#                                 GS.list = panther, GS.idtype = "ENTREZID")
+# ?methylglm()
 #get pathway names
 cols <- "PATHWAY_TERM"
 res.p <- mapIds(PANTHER.db, keys=go_ids, column=cols, 
