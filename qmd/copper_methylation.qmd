@@ -1,5 +1,5 @@
 ---
-title: "Copper pesticide vexposure and DNA methylation"
+title: "Copper pesticide exposure and DNA methylation"
 author: "Yufan Gong"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 format:
