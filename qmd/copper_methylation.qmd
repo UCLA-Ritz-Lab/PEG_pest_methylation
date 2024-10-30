@@ -58,7 +58,7 @@ This project aims to investigate the association between copper pesticide exposu
     - **Things to do**
       - According to the scatter plot, there is few difference between case and control in terms of DNA methylation level. Thus, we don't need to show the result of GSEA for case only.
       - Need to select the first 10 CpG sites solely significant in cases and do another scatter plot for these CpG sites.
-      - Check the association between case and control methylation levels using the original beta values.
+      - Check the association between case and control methylation levels using the original beta values. (per 10/29/24 discussion, the beta values refers to the DMP estimate coefficient betas, not the beta values in the DNAm matrix)
       - Compare DMP models adjusted/not adjusted for PD status in the total study sample (PD could be a collider).
 
 # Load and clean data
