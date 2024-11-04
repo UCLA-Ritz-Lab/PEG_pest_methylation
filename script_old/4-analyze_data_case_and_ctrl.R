@@ -459,29 +459,33 @@ case_count_combined <- count_combine_copper[[1]] %>%
   dplyr::rename(copper_count = total.x,
                 op_count = total.y)
 
-design <- model.matrix(~ ., data = case_count_combined)
-fit <- lmFit(PEG_NOOB_nors_win_filter_case, design)
+design <- model.matrix(~ total, data = count_combine_copper_total)
+fit <- lmFit(combined_resid_win_filter_total, design)
 fit2 <- eBayes(fit)
+
+summary
 sig_cpg_limma <- topTable(fit2, coef=ncol(design), sort.by="p",
-                          number = nrow(PEG_NOOB_nors_win_filter_case), 
+                          number = nrow(combined_resid_win_filter_total), 
                           adjust.method = "BY") %>% 
-  filter(-log10(P.Value) > 5)
+  filter(-log10(P.Value) > 6)
 
 par(mfrow=c(2,5))
 sapply(rownames(sig_cpg_limma)[1:10], function(cpg){
-  plotCpg(PEG_NOOB_nors_win_filter_pd_r, cpg=cpg, 
-          pheno=case_count_combind$copper_count, 
+  plotCpg(combined_resid_win_filter_total, cpg=cpg, 
+          pheno=count_combine_copper_total$total, 
           ylab = "Beta values")
 })
 dev.off()
 
-dat <- data.frame(foldchange = fit[["coefficients"]][,2], 
+dat <- data.frame(foldchange = fit2[["coefficients"]][,2], 
                   logPvalue =  -log10(fit2[["p.value"]][,2]))
-dat$threshold <- as.factor(abs(dat$foldchange) < 0.05)
+dat$threshold <- as.factor(abs(dat$foldchange) < 0.0005)
 
 #Visualization
 cols <- c("TRUE" = "grey", "FALSE" = "blue")
-ggplot(data=dat, aes(x=foldchange, y = logPvalue, color=threshold)) +
+dat %>% 
+  # mutate(threshold = if_else(logFC <= 0.0005, "sig", "notsig")) %>%
+  ggplot(aes(x=foldchange, y = logPvalue, color=threshold)) +
   geom_point(alpha=.6, size=1.2) +
   scale_colour_manual(values = cols) +
   geom_vline(xintercept = 0.0005, colour="#990000", linetype="dashed") + 
@@ -1544,9 +1548,21 @@ patchwork::wrap_plots(plotlist_res_copper_new[[1]], ncol = 5,
                       nrow = 2, guides = "collect")
 
 ## scatter plot to check the association between case and control methylation levels
-# x-axis: cpg beta-value for controls
-# y-axis: cpg beta-value for cases
+# x-axis: dmp beta-value for controls
+# y-axis: dmp beta-value for cases
 
+dmp_beta_ctrl <- dmp_count_ctrl$total %>% 
+  rownames_to_column("cpg") %>%
+  select(cpg, B) %>% 
+  rename(B_ctrl = B)
+
+dmp_beta_case <- dmp_count_case$total %>%
+  rownames_to_column("cpg") %>%
+  select(cpg, B) %>%
+  rename(B_case = B)
+
+dmp_beta_combined <- dmp_beta_ctrl %>% 
+  left_join(dmp_beta_case, by = "cpg")
 
 mean_cpg_res_beta_ctrl <- combined_resid_win_filter_ctrl %>% 
   mutate(mean_beta_ctrl = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
@@ -1567,12 +1583,12 @@ mean_cpg_beta_case <- PEG_NOOB_nors_win_filter_case %>%
 mean_cpg_beta <- bind_cols(mean_cpg_beta_ctrl, mean_cpg_beta_case)
 mean_cpg_res_beta <- bind_cols(mean_cpg_res_beta_ctrl, mean_cpg_res_beta_case)
 
-ggplot(mean_cpg_res_beta, aes(x = mean_beta_ctrl, y = mean_beta_case)) +
+ggplot(dmp_beta_combined, aes(x = B_ctrl, y = B_case)) +
   geom_point(alpha = 0.75) +
   geom_smooth(method = "lm") +
-  stat_cor(label.y = 0.96, size = 12) +
-  labs(x = "Mean adjusted beta value for controls",
-       y = "Mean adjusted beta value for cases")+
+  stat_cor(label.y = 0.96, size = 6) +
+  labs(x = "Adjusted DMP beta value for controls",
+       y = "Adjusted DMP beta value for cases")+
   theme_classic() +
   theme( 
     legend.position = "none",
