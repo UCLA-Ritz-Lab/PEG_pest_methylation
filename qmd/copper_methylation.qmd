@@ -1345,23 +1345,23 @@ datatable(gsea_champ_copper_total$DMP %>%
 ```
 
 
-<!-- ##### PD patients (n = 569) -->
+##### PD patients (n = 569)
 
 ```{r}
-# 
-# datatable(gsea_champ_copper_case$DMP %>% 
-#             arrange(`P.DE`), 
-#           rownames = TRUE,
-#           extensions = "Buttons",
-#           options = list(
-#             dom = "Bfrtip",
-#             buttons = c("copy", "csv", "excel", "pdf", "print"),
-#             scrollX = TRUE, 
-#                          paging=TRUE,
-#                          # fixedHeader=TRUE,
-#                          className = 'dt-center', targets = 0:4),
-#           caption = "Table: Go term analysis in PD patients (n = 569)"
-#           )
+
+datatable(gsea_champ_copper_case$DMP %>%
+            arrange(`P.DE`),
+          rownames = TRUE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE,
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: Go term analysis in PD patients (n = 569)"
+          )
 ```
 
 
@@ -1419,9 +1419,9 @@ datatable(gst_kegg_total %>%
 ```
 
 
-<!-- ##### PD patients (n = 569) -->
+##### PD patients (n = 569)
 
-<!-- No significant KEGG pathway was identified in PD patients. -->
+No significant KEGG pathway was identified in PD patients.
 
 ```{r}
 
@@ -1595,24 +1595,24 @@ datatable(dmr_table_total,
           )
 ```
 
-<!-- #### PD patients (n = 569) -->
+#### PD patients (n = 569)
 
 ```{r}
-# dmr_table_case <- dmr_bumphunter_champ_copper_case$total$BumphunterDMR %>%
-#   arrange(p.valueArea)
-# 
-# datatable(dmr_table_case, 
-#           rownames = TRUE,
-#           extensions = "Buttons",
-#           options = list(
-#             dom = "Bfrtip",
-#             buttons = c("copy", "csv", "excel", "pdf", "print"),
-#             scrollX = TRUE, 
-#                          paging=TRUE,
-#                          # fixedHeader=TRUE,
-#                          className = 'dt-center', targets = 0:4),
-#           caption = "Table: DMR in PD patients (n = 569)"
-#           )
+dmr_table_case <- dmr_bumphunter_champ_copper_case$total$BumphunterDMR %>%
+  arrange(p.valueArea)
+
+datatable(dmr_table_case,
+          rownames = TRUE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE,
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: DMR in PD patients (n = 569)"
+          )
 ```
 
 
@@ -1641,22 +1641,22 @@ datatable(gsea_champ_copper_total$DMR %>%
 ```
 
 
-<!-- ##### PD patients (n = 569) -->
+##### PD patients (n = 569)
 
 ```{r}
 
-# datatable(gsea_champ_copper_case$DMR %>% 
-#             arrange(`P.DE`), 
-#           rownames = TRUE,
-#           extensions = "Buttons",
-#           options = list(
-#             dom = "Bfrtip",
-#             buttons = c("copy", "csv", "excel", "pdf", "print"),
-#             scrollX = TRUE, 
-#                          paging=TRUE,
-#                          # fixedHeader=TRUE,
-#                          className = 'dt-center', targets = 0:4),
-#           caption = "Table: Go term analysis in PD patients (n = 569)"
-#           )
+datatable(gsea_champ_copper_case$DMR %>%
+            arrange(`P.DE`),
+          rownames = TRUE,
+          extensions = "Buttons",
+          options = list(
+            dom = "Bfrtip",
+            buttons = c("copy", "csv", "excel", "pdf", "print"),
+            scrollX = TRUE,
+                         paging=TRUE,
+                         # fixedHeader=TRUE,
+                         className = 'dt-center', targets = 0:4),
+          caption = "Table: Go term analysis in PD patients (n = 569)"
+          )
 ```
 
