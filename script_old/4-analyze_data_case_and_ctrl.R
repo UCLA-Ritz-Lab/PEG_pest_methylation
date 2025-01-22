@@ -459,15 +459,50 @@ case_count_combined <- count_combine_copper[[1]] %>%
   dplyr::rename(copper_count = total.x,
                 op_count = total.y)
 
-design <- model.matrix(~ total, data = count_combine_copper_total)
-fit <- lmFit(combined_resid_win_filter_total, design)
-fit2 <- eBayes(fit)
+design_total <- model.matrix(~ total, data = count_combine_copper_total)
+fit_total <- lmFit(combined_resid_win_filter_total, design)
+fit2_total <- eBayes(fit_total)
 
-summary
-sig_cpg_limma <- topTable(fit2, coef=ncol(design), sort.by="p",
-                          number = nrow(combined_resid_win_filter_total), 
-                          adjust.method = "BY") %>% 
-  filter(-log10(P.Value) > 6)
+design_case <- model.matrix(~ total, data = count_combine_copper[[1]])
+fit_case <- lmFit(combined_resid_win_filter_case, design_case)
+fit2_case <- eBayes(fit_case)
+
+design_ctrl <- model.matrix(~ total, data = count_combine_copper[[2]])
+fit_ctrl <- lmFit(combined_resid_win_filter_ctrl, design_ctrl)
+fit2_ctrl <- eBayes(fit_ctrl)
+
+list(
+  list(fit2_total, fit2_case, fit2_ctrl),
+  list(design_total, design_case, design_ctrl),
+  list(combined_resid_win_filter_total, combined_resid_win_filter_case, 
+       combined_resid_win_filter_ctrl),
+  list(B_total, B_case, B_ctrl),
+  list("total", "case", "ctrl")
+) %>% 
+  pmap(function(data1, data2, data3, data4, data5){
+    topTable(data1, coef=ncol(data2), sort.by="p",
+             number = nrow(data3), 
+             adjust.method = "BY") %>% 
+      rename_all(~str_c(., "_", data5)) %>%
+      rownames_to_column("cpg") %>% 
+      filter(cpg %in% bicor_total$ID) %>% 
+      # sort rows by the cpg order in bicor_total$ID
+      left_join(data4 %>% 
+                  select(total) %>% 
+                  rownames_to_column("cpg"), by = "cpg") %>% 
+      rename(coefficient = total)
+  }) %>% 
+  set_names("sig_cpg_limma_total", "sig_cpg_limma_case", 
+            "sig_cpg_limma_ctrl") %>%
+  list2env(.GlobalEnv)
+
+sig_cpg_limma_final <- list(sig_cpg_limma_total, 
+                            sig_cpg_limma_case, 
+                            sig_cpg_limma_ctrl) %>% 
+  reduce(left_join, by = "cpg")
+
+write_csv(sig_cpg_limma_final, here("tables", "Supplement Table 1.csv"))
+
 
 par(mfrow=c(2,5))
 sapply(rownames(sig_cpg_limma)[1:10], function(cpg){
@@ -1289,12 +1324,10 @@ list(dmp_count_case, dmp_count_total) %>%
       map(function(data){
         datanew <- data %>% 
           dplyr::rename(chr = CHR,
-                        p.value = P.Value) %>% 
+                        p.value = P.Value,
+                        position = MAPINFO) %>% 
           mutate(chr = str_c("chr", chr),
-                 cpg = rownames(.)) %>% 
-          left_join(meffil_count_op_case$total$analyses$all$table %>%
-                      mutate(cpg = rownames(.)) %>%
-                      dplyr::select(cpg, position), by = "cpg")
+                 cpg = rownames(.))
         
         chromosomes <- paste("chr", c(1:22, "X","Y"), sep="")
         chromosomes <- intersect(chromosomes, datanew$chr)
@@ -1550,19 +1583,36 @@ patchwork::wrap_plots(plotlist_res_copper_new[[1]], ncol = 5,
 ## scatter plot to check the association between case and control methylation levels
 # x-axis: dmp beta-value for controls
 # y-axis: dmp beta-value for cases
+library(ggtext)
+# dmp_beta_ctrl <- dmp_count_ctrl$total %>% 
+#   rownames_to_column("cpg") %>%
+#   select(cpg, B) %>% 
+#   rename(B_ctrl = B)
+# 
+# dmp_beta_case <- dmp_count_case$total %>%
+#   rownames_to_column("cpg") %>%
+#   select(cpg, B) %>%
+#   rename(B_case = B)
 
-dmp_beta_ctrl <- dmp_count_ctrl$total %>% 
-  rownames_to_column("cpg") %>%
-  select(cpg, B) %>% 
-  rename(B_ctrl = B)
+dmp_beta_combined <- tibble(
+  B_ctrl = fit2_ctrl$coefficients %>% 
+    as.data.frame() %>% 
+    filter(rownames(.) %in% bicor_total$ID) %>%
+    pull(total),
+  B_case = fit2_case$coefficients %>% 
+    as.data.frame() %>%
+    filter(rownames(.) %in% bicor_total$ID) %>%
+    pull(total)
+)
 
-dmp_beta_case <- dmp_count_case$total %>%
-  rownames_to_column("cpg") %>%
-  select(cpg, B) %>%
-  rename(B_case = B)
+B_ctrl <- fit2_ctrl$coefficients %>% 
+  as.data.frame()
+B_case <- fit2_case$coefficients %>% 
+  as.data.frame()
 
-dmp_beta_combined <- dmp_beta_ctrl %>% 
-  left_join(dmp_beta_case, by = "cpg")
+B_total <- fit2_total$coefficients %>% 
+  as.data.frame()
+  
 
 mean_cpg_res_beta_ctrl <- combined_resid_win_filter_ctrl %>% 
   mutate(mean_beta_ctrl = base::rowMeans(dplyr::select(., starts_with("X")))) %>%
@@ -1586,9 +1636,11 @@ mean_cpg_res_beta <- bind_cols(mean_cpg_res_beta_ctrl, mean_cpg_res_beta_case)
 ggplot(dmp_beta_combined, aes(x = B_ctrl, y = B_case)) +
   geom_point(alpha = 0.75) +
   geom_smooth(method = "lm") +
-  stat_cor(label.y = 0.96, size = 6) +
-  labs(x = "Adjusted DMP beta value for controls",
-       y = "Adjusted DMP beta value for cases")+
+  stat_cor(label.y = 0.003, size = 6) +
+  labs(
+    title = "",
+    x = "Beta coefficients of EWAS among controls",
+    y = "Beta coefficients of EWAS among cases")+
   theme_classic() +
   theme( 
     legend.position = "none",
