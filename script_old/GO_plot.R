@@ -4,7 +4,7 @@ test <- gsea_champ_copper_total$DMP %>%
 test_sort <- test %>% 
   arrange(P.DE) %>% 
   mutate(term = fct_reorder(TERM, P.DE))
-
+library(ggtext)
 
 test_sort %>% 
   mutate(term = fct_rev(term)) %>%

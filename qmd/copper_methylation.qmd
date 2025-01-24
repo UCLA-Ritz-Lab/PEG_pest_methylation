@@ -1510,8 +1510,8 @@ panther_inner <- select(PANTHER.db, keys=go_ids, column=cols,
 methylglm_pan_total_op <- methylglm(cpg.pval = sig_cpg %>% 
                                      pull(P.Value) %>% 
                                      set_names(sig_cpg$cpg),
-                                GS.list = panther, GS.idtype = "ENTREZID")
-
+                                GS.list = panther, GS.idtype = "ENTREZID",
+                                parallel = TRUE)
 
 # ?methylglm()
 #get pathway names

@@ -1593,6 +1593,13 @@ library(ggtext)
 #   rownames_to_column("cpg") %>%
 #   select(cpg, B) %>%
 #   rename(B_case = B)
+B_ctrl <- fit2_ctrl$coefficients %>% 
+  as.data.frame()
+B_case <- fit2_case$coefficients %>% 
+  as.data.frame()
+
+B_total <- fit2_total$coefficients %>% 
+  as.data.frame()
 
 dmp_beta_combined <- tibble(
   B_ctrl = fit2_ctrl$coefficients %>% 
@@ -1605,13 +1612,7 @@ dmp_beta_combined <- tibble(
     pull(total)
 )
 
-B_ctrl <- fit2_ctrl$coefficients %>% 
-  as.data.frame()
-B_case <- fit2_case$coefficients %>% 
-  as.data.frame()
 
-B_total <- fit2_total$coefficients %>% 
-  as.data.frame()
   
 
 mean_cpg_res_beta_ctrl <- combined_resid_win_filter_ctrl %>% 
