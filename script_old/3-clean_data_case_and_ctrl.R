@@ -83,11 +83,11 @@ peg_keyvars %>%
     left_join(indexyr %>% 
                 select(pegid, index_date), by = "pegid") %>% 
     rows_update(tibble(pegid = "80178CW37", a1_schyrs = 16, county = 3,
-                       smokers = 1, race = 1, minority = 1)) %>%
+                       smokers = 1, race = 1, minority = 0)) %>%
     rows_update(tibble(pegid = "82413PR36", a1_schyrs = 9, county =2,
-                       smokers = 1, race = 1, minority = 1, sex = 1)) %>%
+                       smokers = 1, race = 1, minority = 0, sex = 1)) %>%
     rows_update(tibble(pegid = "83620KP43", a1_schyrs = 12, county=1,
-                       smokers = 2, race = 1, minority = 1, sex = 2)) %>% 
+                       smokers = 2, race = 1, minority = 0, sex = 2)) %>% 
     mutate(study = if_else(grepl('^1', pegid), "PEG 1", "PEG 2"),
            race_new = case_when(race == 1 ~ "White",
                                 race == 3 ~ "Hispanic",
