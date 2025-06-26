@@ -501,6 +501,44 @@ save(dmp_count_ctrl, file = "dmp_count_ctrl.RData")
 save(dmp_count_total, file = "dmp_count_total.RData")
 save(dmp_count_ctrlpd_total, file = "dmp_count_ctrlpd_total.RData")
 
+# calculate genomic inflation factor for each DMP result
+
+list(dmp_count_total, dmp_count_case, dmp_count_ctrl) |> 
+  map(function(data){
+   chi = qchisq(data$total |> 
+      pull(adj.P.Val), df = 1, lower.tail = FALSE)
+   lambda = median(chi) / qchisq(0.5, df = 1)
+  }) |> 
+  set_names("lambda_total", "lambda_case", "lambda_ctrl")
+
+list(dmp_count_total, dmp_count_case, dmp_count_ctrl) |> 
+  map(function(data){
+    data$total |> 
+      select(P.Value, adj.P.Val) %>%
+      mutate(
+        observed = -log10(sort(adj.P.Val)),
+        expected = -log10(ppoints(length(adj.P.Val)))
+      ) |> 
+      ggplot(aes(x = expected, y = observed)) +
+      geom_point(size = 1, alpha = 0.6) +
+      geom_abline(slope = 1, intercept = 0, color = "red") +
+      labs(
+        x = expression(Expected~~-log[10](italic(p))),
+        y = expression(Observed~~-log[10](italic(p))),
+        title = "QQ Plot of EWAS p-values"
+      ) +
+      theme_minimal()
+  })
+
+gif_total <- dmp_count_total$total |> 
+  rownames_to_column("cpg") |> 
+  filter(-log10(P.Value) < 6) |>
+  select(P.Value, adj.P.Val) %>%
+  mutate(
+    chi = qchisq(adj.P.Val, df = 1, lower.tail = FALSE),
+    lambda = median(chi) / qchisq(0.5, df = 1))
+
+# check significant DMPs
 test_case <- dmp_count_case$total %>% 
   rownames_to_column("cpg") %>% 
   filter(cpg %in% rownames(test_total))
