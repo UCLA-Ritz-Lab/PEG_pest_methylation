@@ -183,6 +183,70 @@ c(lb_sd_metal_wt_count[[1]],
   bold_labels() %>% 
   table1()
 
+df_tbl1 <- c(lb_sd_metal_wt_count[[1]], 
+          lb_sd_metal_wt_count[[2]]) %>% 
+  map(function(data){
+    data %>% 
+      dplyr::select(all_of(myvar))
+  }) %>% 
+  rbindlist() %>% 
+  left_join(count_combine_copper_total, by = "pegid") %>% 
+  left_join(count_combine_op_total %>% 
+              dplyr::select(pegid, total), by = "pegid") %>%
+  set_variable_labels(
+    pegid = "PEGID",
+    age = "Age",
+    pd_new = "PD status",
+    female = "Sex",
+    #race_new = "Race/Ethnicity",
+    ethnicity = "Ethnicity",
+    smokers = "Smoking status",
+    pdstudystudy = "PEG study",
+    meanmethbysample = "Mean methylation",
+    a1_schyrs = "School years",
+    total.x = "Copper count",
+    total.y = "OP count",
+    county = "County"
+  ) %>% 
+  distinct() %>% 
+  #filter(pegid %in% datSampleSteve$externaldnacode) %>% 
+  dplyr::select(-c(sampleid, pegid, pdstudystudy, county, a1_schyrs))
+
+# create scatter plots for copper and OP count
+
+df_tbl1 |> 
+  group_by(pd_new) |> 
+  group_split() |> 
+  set_names("df_tbl1_case", "df_tbl1_ctrl") |>
+  list2env(.GlobalEnv)
+
+list(
+  list(df_tbl1, df_tbl1_case, df_tbl1_ctrl),
+  list("total study population", "PD cases", "non-PD controls")
+) |>
+  pmap(function(data, pop){
+    data %>% 
+      ggplot(aes(x = total.x, y = total.y)) + 
+      geom_point() +
+      geom_smooth(method = "lm", color = "red") +
+      labs(x = "Copper count",
+           y = "OP count",
+           title = glue("Scatter plot of copper and OP count in {pop}")) +
+      theme_classic() +
+      stat_cor(label.y = 55) +
+      theme( 
+        legend.position = "none",
+        panel.border = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.title.y = element_text(face = "bold", size = 15),
+        axis.title.x = element_text(face = "bold", size = 15),
+        axis.text.y = element_text(size = 15), 
+        axis.text.x = element_text(angle = 60, size = 15, vjust = 0.5)
+      )
+  }) |> 
+  set_names("scatter_total", "scatter_case", "scatter_ctrl")
+
 
 #heavy metal chemical use in total
 list(metal_filter, copper_filter, op_filter) %>% 
@@ -200,6 +264,8 @@ list(metal_filter, copper_filter, op_filter) %>%
   }) %>% 
   set_names("outcheck_metal_all", "outcheck_copper_all", "outcheck_op_all") %>% 
   list2env(.,envir = .GlobalEnv)
+
+library(ggtext)
 
 chem_usage_plot <- list(
   list(outcheck_metal_all, outcheck_copper_all, outcheck_op_all),
@@ -232,7 +298,19 @@ chem_usage_plot <- list(
       scale_color_colorblind() +
       # scale_color_ordinal(labels=c("Without PD", "With PD")) +
       geom_vline(xintercept = 1989, lty=2) +
-      theme_classic()
+      theme_classic() +
+      theme( 
+        legend.position = "bottom",
+        legend.title = element_text(face = "bold", size = 15),
+        legend.text = element_text(size = 15),
+        panel.border = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.title.y = element_markdown(face = "bold", size = 15),
+        axis.title.x = element_text(face = "bold", size = 15),
+        axis.text.y = element_text(size = 15), 
+        axis.text.x = element_text(angle = 60, size = 15, vjust = 0.5)
+      )
   })
 
 
@@ -304,7 +382,17 @@ list(outcheck_metal_specific, outcheck_copper_specific,
           scale_color_colorblind() +
           # scale_color_ordinal(labels=c("Without PD", "With PD")) +
           geom_vline(xintercept = 1989, lty=2) +
-          theme_classic()
+          theme_classic() +
+          theme( 
+            legend.position = "bottom",
+            panel.border = element_blank(),
+            panel.grid.major.x = element_blank(),
+            panel.grid.minor.x = element_blank(),
+            axis.title.y = element_markdown(face = "bold", size = 15),
+            axis.title.x = element_text(face = "bold", size = 15),
+            axis.text.y = element_text(size = 15), 
+            axis.text.x = element_text(angle = 60, size = 15, vjust = 0.5)
+          )
       })
   }) %>% 
   set_names("plotlist_metal", "plotlist_copper", "plotlist_op") %>% 
