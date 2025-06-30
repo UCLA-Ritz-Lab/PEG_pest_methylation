@@ -516,7 +516,7 @@ list(dmp_count_total, dmp_count_case, dmp_count_ctrl) |>
     data$total |> 
       select(P.Value, adj.P.Val) %>%
       mutate(
-        observed = -log10(sort(adj.P.Val)),
+        observed = -log10(sort(P.Value)),
         expected = -log10(ppoints(length(adj.P.Val)))
       ) |> 
       ggplot(aes(x = expected, y = observed)) +
@@ -529,6 +529,19 @@ list(dmp_count_total, dmp_count_case, dmp_count_ctrl) |>
       ) +
       theme_minimal()
   })
+
+dmp_count_total$total |> 
+  # filter(-log10(P.Value) > 6) |>
+  select(P.Value, adj.P.Val) |> 
+  mutate(
+    observed = -log10(sort(P.Value)),
+    expected = -log10(ppoints(length(P.Value)))
+  ) |> 
+  ggplot(aes(x = expected, y = observed)) +
+  geom_point(size = 1, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  theme_minimal()
+
 
 gif_total <- dmp_count_total$total |> 
   rownames_to_column("cpg") |> 
