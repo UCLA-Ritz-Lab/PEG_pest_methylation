@@ -551,6 +551,35 @@ gif_total <- dmp_count_total$total |>
     chi = qchisq(adj.P.Val, df = 1, lower.tail = FALSE),
     lambda = median(chi) / qchisq(0.5, df = 1))
 
+#### sensitivity analysis using bacon ####
+
+library(bacon)
+
+bc_total <- dmp_count_total$total %>% 
+  pull(t) %>% 
+  bacon()
+
+bc_case <- dmp_count_case$total %>% 
+  pull(t) %>% 
+  bacon()
+
+bc_ctrl <- dmp_count_ctrl$total %>% 
+  pull(t) %>% 
+  bacon()
+
+inflation(bc_total)
+inflation(bc_case)
+inflation(bc_ctrl)
+
+plot(bc_total, type="qq")
+plot(bc_case, type="qq")
+plot(bc_ctrl, type="qq")
+
+test <- pval(bc_total, corrected = TRUE) %>% 
+  as.tibble() %>% 
+  rename(p.value = V1) %>% 
+  mutate(adj_p = p.adjust(p.value, method = "BH"))
+
 # check significant DMPs
 test_case <- dmp_count_case$total %>% 
   rownames_to_column("cpg") %>% 
@@ -599,7 +628,7 @@ case_count_combined <- count_combine_copper[[1]] %>%
                 op_count = total.y)
 
 design_total <- model.matrix(~ total, data = count_combine_copper_total)
-fit_total <- lmFit(combined_resid_win_filter_total, design)
+fit_total <- lmFit(combined_resid_win_filter_total, design_total)
 fit2_total <- eBayes(fit_total)
 
 design_case <- model.matrix(~ total, data = count_combine_copper[[1]])
