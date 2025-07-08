@@ -575,10 +575,45 @@ plot(bc_total, type="qq")
 plot(bc_case, type="qq")
 plot(bc_ctrl, type="qq")
 
-test <- pval(bc_total, corrected = TRUE) %>% 
-  as.tibble() %>% 
-  rename(p.value = V1) %>% 
-  mutate(adj_p = p.adjust(p.value, method = "BH"))
+list(
+  list(bc_total, bc_case, bc_ctrl),
+  list(dmp_count_total, dmp_count_case, dmp_count_ctrl)
+) %>% 
+  pmap(function(data1, data2){
+    pval(data1, corrected = TRUE) %>% 
+      as.tibble() %>% 
+      rename(corrected.p.value = V1) %>% 
+      mutate(corrected.fdr = p.adjust(corrected.p.value, method = "BH"),
+             uncorrected.p.value = data2$total$P.Value,
+             cpg = rownames(data2$total)) %>% 
+      relocate(cpg, uncorrected.p.value) %>% 
+      filter(cpg %in% rownames(dmp_count_total$total %>% 
+                                 filter(-log10(P.Value) > 6)))
+  }) %>% 
+  set_names("bc_total_final", "bc_case_final", "bc_ctrl_final") %>%
+  list2env(.GlobalEnv)
+
+bc_final <- list(
+  list(bc_total_final, bc_case_final, bc_ctrl_final),
+  list("total", "case", "ctrl")
+) %>% 
+  pmap(function(data, pop){
+    data %>% 
+      rename_at(vars(-cpg), ~str_c(.x, "_", pop))
+  }) %>% 
+  reduce(left_join, by = "cpg")
+
+library(writexl)
+
+list(
+  list(bc_total_final, bc_case_final, bc_ctrl_final, bc_final),
+  list("bc_total_final", "bc_case_final", "bc_ctrl_final", "bc_final")
+) %>% 
+  pmap(function(data, name){
+    write_xlsx(data, here("tables", str_c(name, ".xlsx")))
+  })
+
+
 
 # check significant DMPs
 test_case <- dmp_count_case$total %>% 
