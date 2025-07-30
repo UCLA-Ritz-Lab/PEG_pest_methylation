@@ -1429,29 +1429,12 @@ columns(PANTHER.db)
 keytypes(PANTHER.db)
 
 go_ids <- keys(PANTHER.db,keytype="PATHWAY_ID")
-cols <- "GOSLIM_ID"
+cols <- "ENTREZ"
 panther <- mapIds(PANTHER.db, keys=go_ids, column=cols, 
                   as.numeric(cols), keytype="PATHWAY_ID", multiVals="list")
 lengths(panther)
 panther_inner <- select(PANTHER.db, keys=go_ids, column=cols, 
                         keytype="PATHWAY_ID", jointype = "left")
-#ALL CpG sites
-#GSEA for panther pathways
-# library(org.Hs.eg.db)
-# 
-# test <- org.Hs.egGO
-# 
-# mapped_genes <- mappedkeys(test)
-# 
-# test_list <- as.list(test[mapped_genes])
-# 
-# if(length(test_list) > 0){
-#   got <- test_list[[1]]
-#   got[[1]][["GOID"]]
-#   got[[1]][["ONTOLOGY"]]
-#   got[[1]][["Evidence"]]
-# }
-
 
 library(methylGSA)
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
@@ -1460,17 +1443,55 @@ sig_cpg <- dmp_count_total$total %>%
   arrange(P.Value) %>% 
   rownames_to_column("cpg")
 
+cpg_gene_map <- ann450k %>%
+  as.data.frame() %>%
+  dplyr::select(CpG = Name, Gene = UCSC_RefGene_Name) %>%
+  separate_rows(Gene, sep = ";") %>%  # Some CpGs map to multiple genes
+  filter(Gene != "") %>% 
+  rename_all(tolower) %>% 
+  filter(cpg %in% rownames(dmp_count_total$total))
+
+# Filter for CpGs in your list
+sig_cpg_gene_map <- cpg_gene_map %>%
+  filter(cpg %in% sig_cpg$cpg)
+
+all_cpg <- dmp_count_total$total %>% 
+  rownames_to_column("cpg")
+
+
+
 methylglm_pan_total_op <- methylglm(cpg.pval = sig_cpg %>% 
                                      pull(P.Value) %>% 
                                      set_names(sig_cpg$cpg),
                                 GS.list = panther, GS.idtype = "ENTREZID")
+# example of how to calculate the number of DE genes in a pathway
+library(org.Hs.eg.db)
 
-test <- gsea_champ_copper_total$DMP %>% 
-  arrange(`P.DE`) %>% 
-  rownames_to_column("GOSLIM_ID") %>% 
-  left_join(panther_inner %>% 
-              dplyr::select(PATHWAY_ID, GOSLIM_ID), by = "GOSLIM_ID") %>% 
-  distinct()
+panther_gene_df_egfr <- data.frame(
+  ENTREZID = panther$P00018, 
+  SYMBOL = mapIds(org.Hs.eg.db, keys = panther$P00018, 
+                  column = "SYMBOL", keytype = "ENTREZID")
+)
+  
+methylglm_pan_total_op_egfr <- panther_gene_df_egfr %>% 
+  mutate(ID = "P00018") %>%
+  # left_join(methylglm_pan_total_op, by = "ID") %>% 
+  mutate(ind = if_else(SYMBOL %in% sig_cpg_gene_map$gene, 1, 0)) %>% 
+  group_by(ID) %>%
+  summarize(DE = sum(ind), .groups = "drop")
+  
+methylglm_pan_total_op_egfr_clean <- methylglm_pan_total_op %>% 
+  left_join(methylglm_pan_total_op_egfr, by = "ID") %>% 
+  rename(N = Size,
+         P.DE = pvalue,
+         FDR = padj) %>% 
+  dplyr::select(ID, DE, N, P.DE, FDR)
+
+
+# res_clean <- res %>%
+#   dplyr::select(Pathway, DE, N = size, P.DE, FDR) %>%
+#   dplyr::arrange(FDR)
+
 # ?methylglm()
 #get pathway names
 cols <- "PATHWAY_TERM"
@@ -1485,10 +1506,10 @@ panther.names <- res.p %>%
     pathway = value
   )
 
-methylglm_path_total_op <- methylglm_pan_total_op %>% 
+methylglm_path_total_op <- methylglm_pan_total_op_egfr_clean %>% 
   left_join(panther.names, by = "ID")
 
-
+save(methylglm_path_total_op, file = "panther_efgr.RData")
 # Visulization ------------------------------------------------------------
 
 library(ggtext)

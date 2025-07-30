@@ -100,10 +100,20 @@ rm(list = ls())
 # 5. create functions -----------------------------------------------------
 
 
-quote_all <- function(...){
-  args<-rlang::ensyms(...)
-  paste(purrr::map(args,as_string),sep = "")
+quote_all <- function(...) {
+  args <- rlang::enquos(...)  # capture all inputs as quosures
+  # applies transformation and returns character vector
+  purrr::map_chr(args, ~{
+    expr <- rlang::get_expr(.x) # extracts the expression from each quosure
+    if (rlang::is_symbol(expr)) {
+      rlang::as_string(expr) 
+    } else {
+      as.character(expr)
+    }
+  }) %>%
+    stringr::str_c(sep = "")
 }
+
 
 `%notin%` <- Negate(`%in%`)
 
