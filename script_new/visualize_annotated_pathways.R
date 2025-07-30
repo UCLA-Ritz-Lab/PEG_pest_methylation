@@ -229,6 +229,8 @@ library(ggrepel)
 library(ggtext)
 library(ggnewscale)
 library(Polychrome)
+# devtools::install_github("hrbrmstr/hrbrthemes")
+library(hrbrthemes)
 
 set.seed(19990121)
 # mypal <- c("#2774AE", "#FFB81C", "#2E8B57")
@@ -238,23 +240,44 @@ names(mypal) <- names(cpg_gene_list_final) %>%
   discard(~str_detect(.x, "nucleoplasm|cellular|transferase"))
   
 
-mypal_grey <- rep(c("#d3d3d3", "#696969"), 11)
+# mypal_grey <- rep(c("#d3d3d3", "#696969"), 11)
+mypal_grey <- rep(c("#696969", "#696969"), 11)
 names(mypal_grey) <- c(1:22)
+
 
 ## Plotting the results
 
-all_cpgs_final %>%
+all_cpgs_final_clean <- all_cpgs_final %>%
+  mutate(
+    term = case_when(
+      pathway == "Cell adhesion" ~ "homophilic cell adhesion via plasma membrane adhesion molecules",
+      pathway == "Phagocytosis" ~ "Fc gamma R-mediated phagocytosis",
+      pathway == "EGFR signaling" ~ "EGF receptor signaling pathway"
+    )) %>% 
+  left_join(pathway_df_final_sort, by = "term") %>% 
+  mutate(
+    pvalue_round = signif((P.DE), digits = 2),
+    pathway_new = str_c(pathway, " (", "Gene Ratio=", DE, "/", N, ", p=", pvalue_round, ")"))
+
+pathway_labels <- setNames(
+  Filter(Negate(is.na), all_cpgs_final_clean$pathway_new),  # values shown in the legend
+  Filter(Negate(is.na), names(cpg_gene_list_final)) # levels in the color aes
+) %>% unique()
+
+
+all_cpgs_final_clean %>% 
   ggplot(aes(x = global, y = -log10(p.value), size = -log10(p.value))) +
   geom_point(aes(color = as_factor(chr)), alpha = 0.75, data = . %>% filter(sig == 0)) +
   scale_color_manual(values = mypal_grey, guide = "none") +
   new_scale_color() +
   geom_point(aes(color = as_factor(sig)), data = . %>% filter(sig == 1)) +
-  scale_color_manual(values = c("1" = "#D1495B"), guide = "none") +
+  # scale_color_manual(values = c("1" = "#D1495B"), guide = "none") +
+  scale_color_manual(values = c("1" = "red3"), guide = "none") +
   new_scale_color() +
   geom_point(aes(color = as_factor(pathway)), data = . %>% 
                filter(pathway %in% c("Cell adhesion", "Phagocytosis", "EGFR signaling"))) +
-  scale_color_manual(values = mypal, name = "Pathway") +
-  geom_hline(yintercept = -log10(10e-7), color = "red", linetype = "dashed") +
+  scale_color_manual(values = mypal, labels = pathway_labels, name = "Pathway") +
+  geom_hline(yintercept = -log10(10e-7), color = "#F8766D", linetype = "dashed") +
   geom_label_repel(aes(label = label),
                    size = 4,
                    box.padding = 1,
@@ -268,7 +291,7 @@ all_cpgs_final %>%
   labs(x = "Chromosome", 
        y = "-log<sub>10</sub>(p)",
        color = "Pathway") + 
-  theme_minimal() +
+  theme_classic() +
   theme(
     legend.position = "inside",
     legend.position.inside = c(0.98, 0.98),
@@ -276,6 +299,8 @@ all_cpgs_final %>%
     panel.border = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
+    legend.text = element_text(size = 16),
+    legend.title = element_text(face = "bold", size = 16),
     axis.title.y = element_markdown(face = "bold", size = 20),
     axis.title.x = element_text(face = "bold", size = 20),
     axis.text.y = element_text(size = 18), 
@@ -349,7 +374,7 @@ p1 <- pathway_df_final_sort %>%
   # facet_wrap(~ONTOLOGY, scales = "free_y") +
   labs(x = NULL, 
        y = bquote("-log<sub>10</sub>(p)")) + 
-  theme_bw()+
+  theme_ipsum() +
   theme( 
     # legend.position = "none",
     panel.border = element_blank(),
