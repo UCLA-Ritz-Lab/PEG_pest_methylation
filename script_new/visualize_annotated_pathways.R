@@ -309,11 +309,15 @@ pathway_labels <- setNames(
 
 
 all_cpgs_final_clean %>% 
+  mutate(label = if_else(label == "cg02313172" 
+                         & pathway == "Phagocytosis", "", label)) %>% 
   ggplot(aes(x = global, y = -log10(p.value), size = -log10(p.value))) +
-  geom_point(aes(color = as_factor(chr)), alpha = 0.3, data = . %>% filter(sig == 0)) +
+  geom_point(aes(color = as_factor(chr)), alpha = 0.3, 
+             size = 2.5, data = . %>% filter(sig == 0)) +
   scale_color_manual(values = mypal_grey, guide = "none") +
   new_scale_color() +
-  geom_point(aes(color = as_factor(sig)), alpha = 0.3, data = . %>% filter(sig == 1)) +
+  geom_point(aes(color = as_factor(sig)), alpha = 0.4, 
+             size = 2.5, data = . %>% filter(sig == 1)) +
   # scale_color_manual(values = c("1" = "#D1495B"), guide = "none") +
   scale_color_manual(values = c("1" = "#b7b5b6"), guide = "none") +
   new_scale_color() +
@@ -321,7 +325,7 @@ all_cpgs_final_clean %>%
                filter(pathway %in% c("Cell adhesion", 
                                      "Phagocytosis", 
                                      "EGFR signaling") 
-                      & sig_path == 1)) +
+                      & sig_path == 1), size = 6) +
   scale_color_manual(values = mypal_path, 
                      # labels = pathway_labels, 
                      name = "Pathway") +
@@ -330,7 +334,7 @@ all_cpgs_final_clean %>%
                filter(pathway %in% c("Cell adhesion", 
                                      "Phagocytosis", 
                                      "EGFR signaling") 
-                      & sig_path == 0)) +
+                      & sig_path == 0), size = 6) +
   scale_color_manual(values = mypal_path_unsig, 
                      # labels = pathway_labels, 
                      name = "Pathway (unassociated CpG)",
@@ -338,11 +342,14 @@ all_cpgs_final_clean %>%
   geom_hline(yintercept = -log10(10e-7), color = "red3", linetype = "solid") +
   geom_hline(yintercept = 2.5, color = "#F8766D", linetype = "dashed") +
   geom_text_repel(aes(label = label),
-                   size = 5,
-                   box.padding = 1,
-                   nudge_x = 0.25,
-                   nudge_y = 0.25,
-                   max.overlaps = Inf) +
+                  size = 10,
+                  box.padding = 1,
+                  point.padding = 2.5, 
+                  force = 20,
+                  # force_pull = 2,
+                  nudge_x = 1,
+                  nudge_y = 1,
+                  max.overlaps = Inf) +
   # geom_label_repel(aes(label = label),
   #                 size = 5,
   #                 box.padding = 1,
@@ -352,28 +359,29 @@ all_cpgs_final_clean %>%
   scale_x_continuous(label = all_cpgs_clean_new$chr, breaks = all_cpgs_clean_new$center) +
   scale_y_continuous(expand = c(0,0), limits = c(0, ylim)) + 
   #scale_color_manual(values = rep(c("#276FBF", "#183059"), unique(length(axis$chr)))) +
-  scale_size_continuous(range = c(3,3), guide = "none") +
+  # scale_size_continuous(range = c(3,3), guide = "none") +
   labs(x = "Chromosome", 
        y = "-log<sub>10</sub>(p)") + 
   theme_classic() +
   theme(
     legend.position = "inside",
-    legend.position.inside = c(0.5, 0.12),
+    legend.position.inside = c(0.5, 0.125),
     legend.direction = "vertical", 
     legend.box = "horizontal",
     # legend.box.spacing = unit(0, "mm"),
-    legend.key.height = unit(1.12, "cm"),
+    legend.key.height = unit(1.1, "cm"),
     # legend.justification = c("right", "top"),
     panel.border = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    legend.text = element_text(size = 18),
-    legend.title = element_text(face = "bold", size = 20),
-    axis.title.y = element_markdown(face = "bold", size = 20),
-    axis.title.x = element_text(face = "bold", size = 20),
-    axis.text.y = element_text(size = 18), 
-    axis.text.x = element_text(size = 16, vjust = 0.5)
+    legend.text = element_text(size = 25),
+    legend.title = element_text(face = "bold", size = 25),
+    axis.title.y = element_markdown(face = "bold", size = 25),
+    axis.title.x = element_text(face = "bold", size = 25),
+    axis.text.y = element_text(size = 20), 
+    axis.text.x = element_text(size = 17, vjust = 0.5)
   )
+
 
 ## 2. lollipop plot ----------
 
