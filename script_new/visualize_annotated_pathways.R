@@ -253,86 +253,6 @@ names(mypal_grey) <- c(1:22)
 
 ## Plotting the results
 
-all_cpgs_final_clean <- all_cpgs_final %>%
-  mutate(
-    term = case_when(
-      pathway == "Cell adhesion" ~ "homophilic cell adhesion via plasma membrane adhesion molecules",
-      pathway == "Phagocytosis" ~ "Fc gamma R-mediated phagocytosis",
-      pathway == "EGFR signaling" ~ "EGF receptor signaling pathway"
-    )) %>% 
-  left_join(pathway_df_final_sort, by = "term") 
-
-# %>% 
-#   mutate(
-#     pvalue_round = signif((P.DE), digits = 2),
-#     pathway_new = str_c(pathway, " (", "Gene Ratio=", DE, "/", N, ", p=", pvalue_round, ")"))
-
-pathway_labels <- setNames(
-  Filter(Negate(is.na), all_cpgs_final_clean$pathway),  # values shown in the legend
-  Filter(Negate(is.na), names(cpg_gene_list_final)) # levels in the color aes
-) %>% unique()
-
-
-all_cpgs_final_clean %>% 
-  ggplot(aes(x = global, y = -log10(p.value), size = -log10(p.value))) +
-  geom_point(aes(color = as_factor(chr)), alpha = 0.75, data = . %>% filter(sig == 0)) +
-  scale_color_manual(values = mypal_grey, guide = "none") +
-  new_scale_color() +
-  geom_point(aes(color = as_factor(sig)), data = . %>% filter(sig == 1)) +
-  # scale_color_manual(values = c("1" = "#D1495B"), guide = "none") +
-  scale_color_manual(values = c("1" = "#b7b5b6"), guide = "none") +
-  new_scale_color() +
-  geom_point(aes(color = as_factor(pathway)), data = . %>% 
-               filter(pathway %in% c("Cell adhesion", 
-                                     "Phagocytosis", 
-                                     "EGFR signaling") 
-                      & sig_path == 1)) +
-  scale_color_manual(values = mypal_path, 
-                     # labels = pathway_labels, 
-                     name = "Pathway (associated CpG)") +
-  new_scale_color() +
-  geom_point(aes(color = as_factor(pathway)), data = . %>% 
-               filter(pathway %in% c("Cell adhesion", 
-                                     "Phagocytosis", 
-                                     "EGFR signaling") 
-                      & sig_path == 0)) +
-  scale_color_manual(values = mypal_path_unsig, 
-                     # labels = pathway_labels, 
-                     name = "Pathway (unassociated CpG)") +
-  geom_hline(yintercept = -log10(10e-7), color = "red3", linetype = "solid") +
-  geom_hline(yintercept = 2.5, color = "#F8766D", linetype = "dashed") +
-  geom_label_repel(aes(label = label),
-                   size = 4,
-                   box.padding = 1,
-                   nudge_x = 0.25,
-                   nudge_y = 0.25,
-                   max.overlaps = Inf) +
-  scale_x_continuous(label = all_cpgs_clean_new$chr, breaks = all_cpgs_clean_new$center) +
-  scale_y_continuous(expand = c(0,0), limits = c(0, ylim)) + 
-  #scale_color_manual(values = rep(c("#276FBF", "#183059"), unique(length(axis$chr)))) +
-  scale_size_continuous(range = c(3,3), guide = "none") +
-  labs(x = "Chromosome", 
-       y = "-log<sub>10</sub>(p)") + 
-  theme_classic() +
-  theme(
-    legend.position = "inside",
-    legend.position.inside = c(0.5, 0.08),
-    legend.direction = "vertical", 
-    legend.box = "horizontal",
-    # legend.justification = c("right", "top"),
-    panel.border = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    legend.text = element_text(size = 16),
-    legend.title = element_text(face = "bold", size = 16),
-    axis.title.y = element_markdown(face = "bold", size = 20),
-    axis.title.x = element_text(face = "bold", size = 20),
-    axis.text.y = element_text(size = 18), 
-    axis.text.x = element_text(size = 16, vjust = 0.5)
-  )
-
-## 2. lollipop plot ----------
-
 pathway_df_go <- list(
   gsea_champ_copper_total$DMP,
   gsea_champ_copper_total$DMR
@@ -367,6 +287,97 @@ pathway_df_final <- list(
 pathway_df_final_sort <- pathway_df_final %>% 
   arrange(P.DE) %>% 
   mutate(term = fct_reorder(TERM, P.DE))
+
+all_cpgs_final_clean <- all_cpgs_final %>%
+  mutate(
+    term = case_when(
+      pathway == "Cell adhesion" ~ "homophilic cell adhesion via plasma membrane adhesion molecules",
+      pathway == "Phagocytosis" ~ "Fc gamma R-mediated phagocytosis",
+      pathway == "EGFR signaling" ~ "EGF receptor signaling pathway"
+    )) %>% 
+  left_join(pathway_df_final_sort, by = "term") 
+
+# %>% 
+#   mutate(
+#     pvalue_round = signif((P.DE), digits = 2),
+#     pathway_new = str_c(pathway, " (", "Gene Ratio=", DE, "/", N, ", p=", pvalue_round, ")"))
+
+pathway_labels <- setNames(
+  Filter(Negate(is.na), all_cpgs_final_clean$pathway),  # values shown in the legend
+  Filter(Negate(is.na), names(cpg_gene_list_final)) # levels in the color aes
+) %>% unique()
+
+
+all_cpgs_final_clean %>% 
+  ggplot(aes(x = global, y = -log10(p.value), size = -log10(p.value))) +
+  geom_point(aes(color = as_factor(chr)), alpha = 0.3, data = . %>% filter(sig == 0)) +
+  scale_color_manual(values = mypal_grey, guide = "none") +
+  new_scale_color() +
+  geom_point(aes(color = as_factor(sig)), alpha = 0.3, data = . %>% filter(sig == 1)) +
+  # scale_color_manual(values = c("1" = "#D1495B"), guide = "none") +
+  scale_color_manual(values = c("1" = "#b7b5b6"), guide = "none") +
+  new_scale_color() +
+  geom_point(aes(color = as_factor(pathway)), data = . %>% 
+               filter(pathway %in% c("Cell adhesion", 
+                                     "Phagocytosis", 
+                                     "EGFR signaling") 
+                      & sig_path == 1)) +
+  scale_color_manual(values = mypal_path, 
+                     # labels = pathway_labels, 
+                     name = "Pathway") +
+  new_scale_color() +
+  geom_point(aes(color = as_factor(pathway)), data = . %>% 
+               filter(pathway %in% c("Cell adhesion", 
+                                     "Phagocytosis", 
+                                     "EGFR signaling") 
+                      & sig_path == 0)) +
+  scale_color_manual(values = mypal_path_unsig, 
+                     # labels = pathway_labels, 
+                     name = "Pathway (unassociated CpG)",
+                     guide = "none") +
+  geom_hline(yintercept = -log10(10e-7), color = "red3", linetype = "solid") +
+  geom_hline(yintercept = 2.5, color = "#F8766D", linetype = "dashed") +
+  geom_text_repel(aes(label = label),
+                   size = 5,
+                   box.padding = 1,
+                   nudge_x = 0.25,
+                   nudge_y = 0.25,
+                   max.overlaps = Inf) +
+  # geom_label_repel(aes(label = label),
+  #                 size = 5,
+  #                 box.padding = 1,
+  #                 nudge_x = 0.25,
+  #                 nudge_y = 0.25,
+  #                 max.overlaps = Inf) +
+  scale_x_continuous(label = all_cpgs_clean_new$chr, breaks = all_cpgs_clean_new$center) +
+  scale_y_continuous(expand = c(0,0), limits = c(0, ylim)) + 
+  #scale_color_manual(values = rep(c("#276FBF", "#183059"), unique(length(axis$chr)))) +
+  scale_size_continuous(range = c(3,3), guide = "none") +
+  labs(x = "Chromosome", 
+       y = "-log<sub>10</sub>(p)") + 
+  theme_classic() +
+  theme(
+    legend.position = "inside",
+    legend.position.inside = c(0.5, 0.12),
+    legend.direction = "vertical", 
+    legend.box = "horizontal",
+    # legend.box.spacing = unit(0, "mm"),
+    legend.key.height = unit(1.12, "cm"),
+    # legend.justification = c("right", "top"),
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.text = element_text(size = 18),
+    legend.title = element_text(face = "bold", size = 20),
+    axis.title.y = element_markdown(face = "bold", size = 20),
+    axis.title.x = element_text(face = "bold", size = 20),
+    axis.text.y = element_text(size = 18), 
+    axis.text.x = element_text(size = 16, vjust = 0.5)
+  )
+
+## 2. lollipop plot ----------
+
+
 
 library(ggtext)
 
