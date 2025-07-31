@@ -207,7 +207,7 @@ all_cpgs_final <- all_cpgs_clean %>%
               rename(gene_filter = gene), by = "cpg") %>% 
   arrange(p.value) %>% 
   mutate(sig = if_else(-log10(p.value) > 6, 1, 0),
-         
+         sig_path = if_else(-log10(p.value) > 2.5, 1, 0),
          label = if_else(sig == 1 & pathway %in% c("Cell adhesion", 
                                                    "Phagocytosis", 
                                                    "EGFR signaling"), cpg, ""))
@@ -233,15 +233,21 @@ library(Polychrome)
 library(hrbrthemes)
 
 set.seed(19990121)
-# mypal <- c("#2774AE", "#FFB81C", "#2E8B57")
-mypal <- c("#2774AE", "#FFB81C", "#2E8B57")
+# mypal <- c("#2774AE", "#FFB81C", "#2E8B57") #"#d43325"red 
+mypal_path <- c("#2b6a99", "#f16c23", "#1b7c3d")
+mypal_path_unsig <- c("#6ea1c3", "#f49a60", "#60b283")
+mypal_path_unsig_light <- c("#a8c6df", "#f8b98a", "#9cd3ae")
 
-names(mypal) <- names(cpg_gene_list_final) %>% 
+
+names(mypal_path) <- names(cpg_gene_list_final) %>% 
+  discard(~str_detect(.x, "nucleoplasm|cellular|transferase"))
+
+names(mypal_path_unsig) <- names(cpg_gene_list_final) %>% 
   discard(~str_detect(.x, "nucleoplasm|cellular|transferase"))
   
 
 # mypal_grey <- rep(c("#d3d3d3", "#696969"), 11)
-mypal_grey <- rep(c("#696969", "#696969"), 11)
+mypal_grey <- rep(c("#b7b5b6", "#b7b5b6"), 11)
 names(mypal_grey) <- c(1:22)
 
 
@@ -254,13 +260,15 @@ all_cpgs_final_clean <- all_cpgs_final %>%
       pathway == "Phagocytosis" ~ "Fc gamma R-mediated phagocytosis",
       pathway == "EGFR signaling" ~ "EGF receptor signaling pathway"
     )) %>% 
-  left_join(pathway_df_final_sort, by = "term") %>% 
-  mutate(
-    pvalue_round = signif((P.DE), digits = 2),
-    pathway_new = str_c(pathway, " (", "Gene Ratio=", DE, "/", N, ", p=", pvalue_round, ")"))
+  left_join(pathway_df_final_sort, by = "term") 
+
+# %>% 
+#   mutate(
+#     pvalue_round = signif((P.DE), digits = 2),
+#     pathway_new = str_c(pathway, " (", "Gene Ratio=", DE, "/", N, ", p=", pvalue_round, ")"))
 
 pathway_labels <- setNames(
-  Filter(Negate(is.na), all_cpgs_final_clean$pathway_new),  # values shown in the legend
+  Filter(Negate(is.na), all_cpgs_final_clean$pathway),  # values shown in the legend
   Filter(Negate(is.na), names(cpg_gene_list_final)) # levels in the color aes
 ) %>% unique()
 
@@ -272,12 +280,27 @@ all_cpgs_final_clean %>%
   new_scale_color() +
   geom_point(aes(color = as_factor(sig)), data = . %>% filter(sig == 1)) +
   # scale_color_manual(values = c("1" = "#D1495B"), guide = "none") +
-  scale_color_manual(values = c("1" = "red3"), guide = "none") +
+  scale_color_manual(values = c("1" = "#b7b5b6"), guide = "none") +
   new_scale_color() +
   geom_point(aes(color = as_factor(pathway)), data = . %>% 
-               filter(pathway %in% c("Cell adhesion", "Phagocytosis", "EGFR signaling"))) +
-  scale_color_manual(values = mypal, labels = pathway_labels, name = "Pathway") +
-  geom_hline(yintercept = -log10(10e-7), color = "#F8766D", linetype = "dashed") +
+               filter(pathway %in% c("Cell adhesion", 
+                                     "Phagocytosis", 
+                                     "EGFR signaling") 
+                      & sig_path == 1)) +
+  scale_color_manual(values = mypal_path, 
+                     # labels = pathway_labels, 
+                     name = "Pathway (associated CpG)") +
+  new_scale_color() +
+  geom_point(aes(color = as_factor(pathway)), data = . %>% 
+               filter(pathway %in% c("Cell adhesion", 
+                                     "Phagocytosis", 
+                                     "EGFR signaling") 
+                      & sig_path == 0)) +
+  scale_color_manual(values = mypal_path_unsig, 
+                     # labels = pathway_labels, 
+                     name = "Pathway (unassociated CpG)") +
+  geom_hline(yintercept = -log10(10e-7), color = "red3", linetype = "solid") +
+  geom_hline(yintercept = 2.5, color = "#F8766D", linetype = "dashed") +
   geom_label_repel(aes(label = label),
                    size = 4,
                    box.padding = 1,
@@ -287,15 +310,16 @@ all_cpgs_final_clean %>%
   scale_x_continuous(label = all_cpgs_clean_new$chr, breaks = all_cpgs_clean_new$center) +
   scale_y_continuous(expand = c(0,0), limits = c(0, ylim)) + 
   #scale_color_manual(values = rep(c("#276FBF", "#183059"), unique(length(axis$chr)))) +
-  scale_size_continuous(range = c(0.5,3), guide = "none") +
+  scale_size_continuous(range = c(3,3), guide = "none") +
   labs(x = "Chromosome", 
-       y = "-log<sub>10</sub>(p)",
-       color = "Pathway") + 
+       y = "-log<sub>10</sub>(p)") + 
   theme_classic() +
   theme(
     legend.position = "inside",
-    legend.position.inside = c(0.98, 0.98),
-    legend.justification = c("right", "top"),
+    legend.position.inside = c(0.5, 0.08),
+    legend.direction = "vertical", 
+    legend.box = "horizontal",
+    # legend.justification = c("right", "top"),
     panel.border = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
